@@ -1,0 +1,105 @@
+/* Import Open Sans from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap');
+
+/* Apply Open Sans font to the entire body */
+body {
+    font-family: 'Open Sans', sans-serif; /* Use Open Sans with fallback to sans-serif */
+}
+/* Styling for h1 to make it smaller */
+header h1 {
+  font-size: 20px; /* Adjust the font size as needed */
+  margin: 0; /* Optional: Adjust margin if needed */
+}
+/* Basic styling for navigation container */
+nav {
+  background-color: #f1f1f1;
+  padding: 20px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-wrap: wrap;  /* Allows nav items to wrap onto the next line */
+  gap: 10px;  /* Provides space between items */
+}
+
+/* Styling for individual navigation links */
+nav a {
+  padding: 12px 24px;  /* Increased padding for better visibility and clickability */
+  text-decoration: none;
+  color: black;
+  background-color: #e7e7e7;
+  border-radius: 6px;  /* Slightly larger border radius for aesthetic */
+  transition: background-color 0.3s;
+  white-space: nowrap;  /* Prevents text from wrapping */
+  font-size: 16px;  /* Larger font size for readability */
+}
+
+/* Hover effect for navigation links */
+nav a:hover {
+  background-color: #ddd;
+}
+
+/* Styling for active link */
+nav a.active {
+  background-color: #ccc;
+  color: white;  /* Makes active link text color white for contrast */
+}
+
+.sub-nav a, .sub-nav button, .top-nav a, .top-nav button {
+  padding: 12px 24px;
+  text-decoration: none;
+  color: black;
+  background-color: #e7e7e7;
+  border-radius: 6px;
+  transition: background-color 0.3s;
+  white-space: nowrap;
+  font-size: 16px;
+  border: none; /* Remove default button border */
+}
+
+.sub-nav a:hover, .sub-nav button:hover, .top-nav a:hover, .top-nav button:hover {
+  background-color: #ddd;
+}
+
+.sub-nav a.active-tab, .sub-nav button.active-tab, .top-nav a.active-tab, .top-nav button.active-tab {
+  background-color: #007bff;
+  color: white;
+}
+
+.tab-content {
+  margin-top: 20px; 
+}
+
+.header-container {
+  display: flex; /* Enable flexbox for positioning */
+  align-items: center; /* Align items vertically */
+}
+
+.badge {
+  background-color: #ffe5e5;
+  color: black;
+  padding: 5px 10px;
+  border-radius: 15px;
+  font-size: 11px;
+  margin-top: -10px;  /* Adjust negative margin to move up */
+  margin-left: 10px; /* Space between the heading and the badge */
+}
+
+#map {
+  height: 500px;
+}
+
+/* Leaflet map adjustments */
+.leaflet-container {
+  background: #f8f9fa; /* Light background color for map */
+}
+
+.leaflet-interactive {
+  stroke: #000000; /* Very light line color for district boundaries */
+  stroke-width: 1; /* Thin line */
+  fill: none;
+  transition: fill 0.3s;
+}
+
+.leaflet-interactive:hover {
+  fill: #000000;
+  fill-opacity: 0.1; /* Very light opacity on hover */
+}
