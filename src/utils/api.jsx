@@ -1,15 +1,20 @@
 // utils/api.js
-export const fetchDataFromAPI = async (endpoint, baseQuery) => {
+export const fetchDataFromAPI = async (queryObject) => {
   const baseUrl = "https://data.sfgov.org/resource/";
   let allData = [];
   let limit = 1000; // Set the limit for each request
   let offset = 0; // Initialize offset
   let hasMoreData = true;
 
+  const { endpoint, query } = queryObject;
+  if (!endpoint || !query) {
+    console.error("Invalid query object:", queryObject);
+    return null; // Handle invalid query object
+  }
+
   while (hasMoreData) {
     const url = new URL(baseUrl + endpoint);
-    // Include $limit and $offset directly in the $query
-    const fullQuery = `${baseQuery} LIMIT ${limit} OFFSET ${offset}`;
+    const fullQuery = `${query} LIMIT ${limit} OFFSET ${offset}`;
     url.searchParams.append("$query", fullQuery);
 
     console.log("URL being requested:", url.href); // Debug output
@@ -35,23 +40,3 @@ export const fetchDataFromAPI = async (endpoint, baseQuery) => {
 
   return allData;
 };
-
-export const fetchGeoJsonFromAPI = async (url, params) => {
-  const queryString = new URLSearchParams(params).toString();
-  const requestUrl = `${url}?${queryString}`;
-
-  console.log("URL being requested:", requestUrl); // Debug output
-
-  try {
-    const response = await fetch(requestUrl);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error("Failed to fetch GeoJSON data:", error);
-    return null; // Return null or appropriate error handling
-  }
-};
-

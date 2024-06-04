@@ -1,27 +1,28 @@
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { List, ListItemButton, ListItemText } from "@mui/material";
 
-function TopNav({ selectedDistrict, setSelectedDistrict }) {
-  const location = useLocation();
-
-  const getActiveClass = (path) => (location.pathname === path ? "active-tab" : "");
-
+function TopNav({ supervisors, setSelectedDistrict }) {
   return (
-    <nav className="top-nav">
-      <Link to="/" className={getActiveClass("/")} onClick={() => setSelectedDistrict(null)}>
-        Citywide
-      </Link>
-      {Array.from({ length: 11 }, (_, i) => (
-        <Link
-          key={i}
-          to={`/district/${i + 1}`}
-          className={getActiveClass(`/district/${i + 1}`)}
-          onClick={() => setSelectedDistrict(i + 1)}
+    <List>
+      <ListItemButton
+        component={Link}
+        to="/"
+        onClick={() => setSelectedDistrict(null)}
+      >
+        <ListItemText primary="Citywide" />
+      </ListItemButton>
+      {supervisors.map((supervisor) => (
+        <ListItemButton
+          key={Math.round(supervisor.sup_dist_num)}
+          component={Link}
+          to={`/${supervisor.sup_name.replace(/\s+/g, "-").toLowerCase()}/district/${supervisor.sup_dist_num}`}
+          onClick={() => setSelectedDistrict(supervisor.sup_dist_num)}
         >
-          District {i + 1}
-        </Link>
+          <ListItemText primary={`${supervisor.sup_name} (District ${Math.round(supervisor.sup_dist_num)})`} />
+        </ListItemButton>
       ))}
-    </nav>
+    </List>
   );
 }
 

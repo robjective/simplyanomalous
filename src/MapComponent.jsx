@@ -1,10 +1,89 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { fetchDataFromAPI } from "./utils/api";
+import { getSupervisorQuery } from "./utils/queries";
 
 const MapComponent = ({ intersectionData, onDistrictClick }) => {
   const mapRef = useRef(null);
   const markersRef = useRef([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchDistrictData = async () => {
+    setIsLoading(true);
+    const queryObject = getSupervisorQuery();
+
+    try {
+      const data = await fetchDataFromAPI(queryObject);
+      const geoJsonData = {
+        type: "FeatureCollection",
+        features: data.map((item) => {
+          let geometry;
+          try {
+            geometry = item.multipolygon;
+          } catch (error) {
+            console.error("Error parsing multipolygon:", error, item.multipolygon);
+            return null;
+          }
+          return {
+            type: "Feature",
+            properties: {
+              district: item.sup_dist_num,
+              supervisor: item.sup_name,
+            },
+            geometry,
+          };
+        }).filter(feature => feature !== null),
+      };
+
+      if (mapRef.current) {
+        L.geoJSON(geoJsonData, {
+          style: (feature) => ({
+            color: "#000000", // Line color for district boundaries
+            weight: 1, // Thin line
+            fillOpacity: 0.2, // Slight fill opacity for better interaction
+          }),
+          onEachFeature: (feature, layer) => {
+            layer.bindPopup(`
+              <div>
+                <strong>District:</strong> ${feature.properties.district}<br>
+                <strong>Supervisor:</strong> ${feature.properties.supervisor}
+              </div>
+            `);
+            layer.on({
+              mouseover: (e) => {
+                e.target.setStyle({
+                  fillColor: "#000000",
+                  fillOpacity: 0.3, // Increase opacity on hover
+                });
+              },
+              mouseout: (e) => {
+                e.target.setStyle({
+                  fillOpacity: 0.2, // Reset fill opacity
+                });
+              },
+              click: (e) => {
+                console.log("Feature clicked:", feature.properties);
+                const bounds = layer.getBounds();
+                mapRef.current.fitBounds(bounds); // Zoom to the clicked district
+                onDistrictClick(feature.properties.district); // Call the callback with the district number
+              },
+            });
+            if (layer.getElement) {
+              const element = layer.getElement();
+              if (element) {
+                element.style.cursor = "pointer"; // Set cursor for entire layer
+              }
+            }
+          },
+        }).addTo(mapRef.current);
+      }
+      setIsLoading(false);
+    } catch (error) {
+      console.error("Error loading district data:", error);
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!mapRef.current) {
@@ -20,53 +99,15 @@ const MapComponent = ({ intersectionData, onDistrictClick }) => {
         scrollWheelZoom: false, // Disable scroll zoom
       });
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      // Use a tile layer with minimal labels
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        noWrap: true,
       }).addTo(map);
 
-      // Fetch GeoJSON data from ArcGIS REST API
-      const geojsonUrl =
-        "https://services.arcgis.com/Zs2aNLFN00jrS4gG/ArcGIS/rest/services/Proposed_Final_Map_04_25_22_SHP/FeatureServer/0/query?where=1=1&outFields=*&f=geojson";
-
-      fetch(geojsonUrl)
-        .then((response) => response.json())
-        .then((data) => {
-          L.geoJSON(data, {
-            style: feature => ({
-              color: "#000000", // Line color for district boundaries
-              weight: 1, // Thin line
-              fillOpacity: 0.2, // Slight fill opacity for better interaction
-            }),
-            onEachFeature: (feature, layer) => {
-              layer.on({
-                mouseover: (e) => {
-                  e.target.setStyle({
-                    fillColor: "#000000",
-                    fillOpacity: 0.3, // Increase opacity on hover
-                  });
-                },
-                mouseout: (e) => {
-                  e.target.setStyle({
-                    fillOpacity: 0.2, // Reset fill opacity
-                  });
-                },
-                click: (e) => {
-                  console.log("Feature clicked:", feature.properties);
-                  const bounds = layer.getBounds();
-                  map.fitBounds(bounds); // Zoom to the clicked district
-                  onDistrictClick(feature.properties.district); // Call the callback with the district number
-                },
-              });
-              if (layer.getElement) {
-                layer.getElement().style.cursor = "pointer"; // Set cursor for entire layer
-              }
-            },
-          }).addTo(map);
-        })
-        .catch((error) => console.error("Error loading GeoJSON data:", error));
-
       mapRef.current = map;
+
+      fetchDistrictData();
     }
   }, [onDistrictClick]);
 
@@ -102,7 +143,12 @@ const MapComponent = ({ intersectionData, onDistrictClick }) => {
     }
   }, [intersectionData]);
 
-  return <div id="map" style={{ height: "500px" }}></div>;
+  return (
+    <div>
+      {isLoading && <div>Loading district data...</div>}
+      <div id="map" style={{ height: "500px" }}></div>
+    </div>
+  );
 };
 
 export default MapComponent;

@@ -1,196 +1,128 @@
-import { parseISO, startOfWeek, isWithinInterval, addWeeks, differenceInWeeks } from "date-fns";
-import { calculateDateRanges, formatDateRanges } from "./dateUtils.js";
-import { CATEGORY_GROUPS, getCategoryGroup } from "./categoryMappings.js";
+import { parseISO, isWithinInterval } from "date-fns";
+import { getCategoryGroup } from "./categoryMappings.js";
 
-export const processData = (data, recentWeeks = 2, longTermWeeks = 52) => {
-  const today = new Date();
-  const {
-    lastCompleteWeekEnd,
-    recentStart,
-    recentEnd,
-    longTermStart,
-    longTermEnd,
-    previousYearStart,
-    previousYearEnd
-  } = calculateDateRanges(today, recentWeeks, longTermWeeks);
-
-  const numberOfRecentWeeks = differenceInWeeks(lastCompleteWeekEnd, recentStart);
-
+export const processData = (data, recentStart, recentEnd, comparisonStart, comparisonEnd) => {
   const groupedData = {};
-  const aggregateData = {
+
+  // Initialize aggregate data structure for groups and categories
+  const initializeCategoryData = () => ({
+    entries: {},
     recentCounts: [],
-    longTermCounts: [],
-    previousYearCounts: [],
+    comparisonCounts: [],
     stats: {
       recentAvg: 0,
-      longTermAvg: 0,
+      comparisonAvg: 0,
       recentStdDev: 0,
-      longTermStdDev: 0,
-      previousYearAvg: 0,
+      comparisonStdDev: 0,
       yoyChange: 0,
     },
-  };
+  });
 
+//  console.log('Initial Data:', data);
+//  console.log('Date Intervals - Recent:', recentStart, recentEnd, 'Comparison:', comparisonStart, comparisonEnd);
+
+  // Process each data item
   data.forEach((item) => {
-    const { incident_category, year, week, count } = item;
-    const safeYear = parseInt(year, 10);
-    const safeWeek = parseInt(week, 10);
-    const parsedCount = parseInt(count, 10);
+    const { incident_category, date, count } = item;
 
-    if (isNaN(safeYear) || isNaN(safeWeek) || isNaN(parsedCount)) {
-      console.error(
-        `Invalid data point skipped: Year: ${year}, Week: ${week}, Count: ${count}`
-      );
+    if (!date || !count) {
+      console.error(`Missing data point skipped: Date: ${date}, Count: ${count}`);
       return;
     }
 
-    let date = startOfWeek(parseISO(`${safeYear}-W${String(safeWeek).padStart(2, "0")}-1`), { weekStartsOn: 1 });
-    if (isNaN(date.getTime()) || date > lastCompleteWeekEnd) {
-      console.error(
-        `Invalid or future date from parsed data, skipped: Year: ${year}, Week: ${week}`
-      );
-      return; // Skip this entry
+    const parsedDate = parseISO(date);
+    if (isNaN(parsedDate.getTime())) {
+      console.error(`Invalid date format skipped: Date: ${date}`);
+      return;
     }
 
+    const parsedCount = parseInt(count, 10);
+    if (isNaN(parsedCount)) {
+      console.error(`Invalid count format skipped: Date: ${date}, Count: ${count}`);
+      return;
+    }
+
+    const categoryGroup = getCategoryGroup(incident_category);
+    if (!groupedData[categoryGroup]) {
+      groupedData[categoryGroup] = initializeCategoryData();
+    }
     if (!groupedData[incident_category]) {
-      groupedData[incident_category] = {
-        entries: [],
-        recentCounts: [],
-        longTermCounts: [],
-        previousYearCounts: [],
-        stats: {
-          recentAvg: 0,
-          longTermAvg: 0,
-          recentStdDev: 0,
-          longTermStdDev: 0,
-          previousYearAvg: 0,
-          yoyChange: 0,
-        },
-      };
+      groupedData[incident_category] = initializeCategoryData();
     }
 
-    groupedData[incident_category].entries.push({
-      date,
-      count: parsedCount,
+    // Aggregate counts on the same date
+    const dateKey = parsedDate.toISOString().split('T')[0]; // Get date in YYYY-MM-DD format
+    groupedData[categoryGroup].entries[dateKey] = (groupedData[categoryGroup].entries[dateKey] || 0) + parsedCount;
+    groupedData[incident_category].entries[dateKey] = (groupedData[incident_category].entries[dateKey] || 0) + parsedCount;
+  });
+
+  // Log aggregated entries
+  console.log('Aggregated Entries:', groupedData);
+
+  // Convert aggregated entries back to array format and populate counts
+  Object.keys(groupedData).forEach(category => {
+    if (category === "metadata") return;
+
+    const entriesMap = groupedData[category].entries;
+    groupedData[category].entries = Object.entries(entriesMap).map(([date, count]) => ({
+      date: new Date(date),
+      count
+    }));
+
+    // Populate counts for statistical calculations
+    groupedData[category].entries.forEach(({ date, count }) => {
+      if (isWithinInterval(date, { start: comparisonStart, end: comparisonEnd })) {
+        groupedData[category].comparisonCounts.push(count);
+      }
+      if (isWithinInterval(date, { start: recentStart, end: recentEnd })) {
+        groupedData[category].recentCounts.push(count);
+      }
     });
 
-    if (isWithinInterval(date, { start: longTermStart, end: longTermEnd })) {
-      groupedData[incident_category].longTermCounts.push(parsedCount);
-      aggregateData.longTermCounts.push(parsedCount);
-    }
+    // Log counts for debugging
+    //console.log(`Category: ${category}, Recent Counts:`, groupedData[category].recentCounts, 'Comparison Counts:', groupedData[category].comparisonCounts);
 
-    if (isWithinInterval(date, { start: recentStart, end: lastCompleteWeekEnd })) {
-      groupedData[incident_category].recentCounts.push(parsedCount);
-      aggregateData.recentCounts.push(parsedCount);
-    }
-
-    if (isWithinInterval(date, { start: previousYearStart, end: previousYearEnd })) {
-      groupedData[incident_category].previousYearCounts.push(parsedCount);
-      aggregateData.previousYearCounts.push(parsedCount);
-    }
-  });
-
-  // Fill in missing weeks with zero counts for groupedData
-  Object.keys(groupedData).forEach((category) => {
-    const categoryData = groupedData[category];
-    let current = startOfWeek(longTermStart, { weekStartsOn: 1 });
-
-    while (current <= lastCompleteWeekEnd) {
-      if (!categoryData.entries.some((entry) => entry.date.getTime() === current.getTime())) {
-        categoryData.entries.push({ date: new Date(current), count: 0 });
-      }
-      current = addWeeks(current, 1);
-    }
-
-    // Ensure previous year period is filled with zeros if no data points are present
-    let previousYearCurrent = startOfWeek(previousYearStart, { weekStartsOn: 1 });
-    while (previousYearCurrent <= previousYearEnd) {
-      if (!categoryData.entries.some((entry) => entry.date.getTime() === previousYearCurrent.getTime())) {
-        categoryData.entries.push({ date: new Date(previousYearCurrent), count: 0 });
-      }
-      previousYearCurrent = addWeeks(previousYearCurrent, 1);
-    }
-
-    categoryData.entries.sort((a, b) => a.date - b.date);
-  });
-
-  // Calculate averages and standard deviations for groupedData
-  Object.keys(groupedData).forEach((category) => {
-    const { recentCounts, longTermCounts, previousYearCounts } = groupedData[category];
+    // Calculate averages and standard deviations
     const calculateStats = (counts) => {
-      const average = counts.reduce((sum, val) => sum + val, 0) / counts.length;
+      if (counts.length === 0) return { average: 0, stdDev: 0 };
+      const sum = counts.reduce((sum, val) => sum + val, 0);
+      const average = sum / counts.length;
       const stdDev = Math.sqrt(
-        counts.reduce((sum, val) => sum + Math.pow(val - average, 2), 0) /
-          counts.length
+        counts.reduce((sum, val) => sum + Math.pow(val - average, 2), 0) / counts.length
       );
       return { average, stdDev };
     };
 
+    const { recentCounts, comparisonCounts } = groupedData[category];
     if (recentCounts.length > 0) {
       const recentStats = calculateStats(recentCounts);
       groupedData[category].stats.recentAvg = recentStats.average;
       groupedData[category].stats.recentStdDev = recentStats.stdDev;
+      //console.log(`Recent Stats for ${category}:`, recentStats);
     }
 
-    if (longTermCounts.length > 0) {
-      const longTermStats = calculateStats(longTermCounts);
-      groupedData[category].stats.longTermAvg = longTermStats.average;
-      groupedData[category].stats.longTermStdDev = longTermStats.stdDev;
+    if (comparisonCounts.length > 0) {
+      const comparisonStats = calculateStats(comparisonCounts);
+      groupedData[category].stats.comparisonAvg = comparisonStats.average;
+      groupedData[category].stats.comparisonStdDev = comparisonStats.stdDev;
+      //console.log(`Comparison Stats for ${category}:`, comparisonStats);
     }
 
-    if (previousYearCounts.length > 0) {
-      const previousYearStats = calculateStats(previousYearCounts);
-      groupedData[category].stats.previousYearAvg = previousYearStats.average;
-      groupedData[category].stats.yoyChange = ((groupedData[category].stats.recentAvg - previousYearStats.average) / previousYearStats.average) * 100;
+    if (groupedData[category].stats.recentAvg > 0 && groupedData[category].stats.comparisonAvg > 0) {
+      groupedData[category].stats.yoyChange = ((groupedData[category].stats.recentAvg - groupedData[category].stats.comparisonAvg) / groupedData[category].stats.comparisonAvg) * 100;
     }
   });
 
-  // Calculate sums, averages and standard deviations for aggregateData
-  const calculateStats = (counts) => {
-    const sum = counts.reduce((sum, val) => sum + val, 0);
-    const average = sum / counts.length;
-    const stdDev = Math.sqrt(
-      counts.reduce((sum, val) => sum + Math.pow(val - average, 2), 0) /
-      counts.length
-    );
-    return { sum, average, stdDev };
-  };
-
-  if (aggregateData.recentCounts.length > 0) {
-    const recentStats = calculateStats(aggregateData.recentCounts);
-    aggregateData.stats.recentAvg = recentStats.average;
-    aggregateData.stats.recentStdDev = recentStats.stdDev;
-  }
-
-  if (aggregateData.longTermCounts.length > 0) {
-    const longTermStats = calculateStats(aggregateData.longTermCounts);
-    aggregateData.stats.longTermAvg = longTermStats.average;
-    aggregateData.stats.longTermStdDev = longTermStats.stdDev;
-  }
-
-  if (aggregateData.previousYearCounts.length > 0) {
-    const previousYearStats = calculateStats(aggregateData.previousYearCounts);
-    aggregateData.stats.previousYearAvg = previousYearStats.average;
-    aggregateData.stats.yoyChange = ((aggregateData.stats.recentAvg - previousYearStats.average) / previousYearStats.average) * 100;
-  }
-
-  const metadata = {
-    ...formatDateRanges(
+  //console.log("Processed Data:", groupedData);
+  return {
+    groupedData,
+    metadata: {
       recentStart,
-      lastCompleteWeekEnd,
-      longTermStart,
-      longTermEnd,
-      previousYearStart,
-      previousYearEnd
-    ),
-    numberOfRecentWeeks
+      recentEnd,
+      comparisonStart,
+      comparisonEnd
+    }
   };
-
-  console.log("Processed Data:", groupedData);
-  console.log("Aggregate Data:", aggregateData);
-  console.log("Metadata:", metadata);
-
-  return { groupedData: { ...groupedData, aggregateData }, metadata: metadata };
 };
 
 export const calculateStatisticsAndAnomalies = (groupedData) => {
@@ -211,17 +143,15 @@ export const calculateStatisticsAndAnomalies = (groupedData) => {
       return;
     }
 
-    const { recentAvg, longTermAvg, recentStdDev, longTermStdDev, previousYearAvg, yoyChange } = stats;
-
-    if (Math.abs(recentAvg - longTermAvg) > longTermStdDev) {
+    const { recentAvg, comparisonAvg, recentStdDev, comparisonStdDev, yoyChange } = stats;
+    if (Math.abs(recentAvg - comparisonAvg) > comparisonStdDev) {
       anomalies.push({
         category,
         recentAvg,
-        longTermAvg,
-        previousYearAvg,
+        comparisonAvg,
         yoyChange,
-        deviation: Math.abs(recentAvg - longTermAvg),
-        stdDev: longTermStdDev,
+        deviation: Math.abs(recentAvg - comparisonAvg),
+        stdDev: comparisonStdDev,
         entries, // Ensure entries are passed to the anomalies
       });
     }
@@ -230,10 +160,10 @@ export const calculateStatisticsAndAnomalies = (groupedData) => {
       category,
       entries: entries || [], // Ensure entries is always an array
       recentAvg,
-      longTermAvg,
-      previousYearAvg,
+      comparisonAvg,
       yoyChange,
-      stdDev: longTermStdDev,
+      recentStdDev,
+      comparisonStdDev,
     });
   });
 

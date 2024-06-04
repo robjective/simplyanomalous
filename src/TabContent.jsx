@@ -1,104 +1,201 @@
 import React, { useState, useEffect } from "react";
 import ErrorBarCharts from "./ErrorBarCharts";
 import AnomalyDisplay from "./AnomalyDisplay";
-import MapComponent from "./MapComponent";
+import CrimeDash from "./CrimeDash";
 import { fetchDataFromAPI } from "./utils/api";
+import { getSupervisorQuery, getIncidentQuery, getAnomalyQuery } from "./utils/queries";
 import { processData } from "./utils/dataProcessing";
+import { processCrimeData } from "./utils/crimeDataProcessing";
+import { CircularProgress, Box, Typography, Tabs, Tab, ToggleButton, ToggleButtonGroup } from '@mui/material';
 
-function TabContent({ district }) {
+function TabContent({ district, setSelectedSupervisors }) {
   const [allData, setAllData] = useState([]);
+  const [crimeDashData, setCrimeDashData] = useState([]);
+  const [districtData, setDistrictData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [metadata, setMetadata] = useState({});
-  const [activeTab, setActiveTab] = useState("anomalies"); // Set default tab to "anomalies"
-  const [incidentData, setIncidentData] = useState([]); // State to hold incidents data
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [incidentData, setIncidentData] = useState([]);
+  const [dateRange, setDateRange] = useState("lastTwoWeeks");
+  const [startDateRecent, setStartDateRecent] = useState(new Date());
+  const [endDateRecent, setEndDateRecent] = useState(new Date());
+  const [startDateComparison, setStartDateComparison] = useState(new Date());
+  const [endDateComparison, setEndDateComparison] = useState(new Date());
+
+  useEffect(() => {
+    setActiveTab("dashboard");
+  }, [district]);
+
+  useEffect(() => {
+    setInitialDates();
+  }, [dateRange]);
 
   useEffect(() => {
     fetchDistrictData(district);
-  }, [district]);
+  }, [district, dateRange, startDateRecent, endDateRecent, startDateComparison, endDateComparison]);
 
-  useEffect(() => {
-    setActiveTab("anomalies");
-  }, [district]);
+  const setInitialDates = () => {
+    const today = new Date();
+    const yesterdayMidnight = new Date(today);
+    yesterdayMidnight.setDate(yesterdayMidnight.getDate() - 1);
+    yesterdayMidnight.setHours(23, 59, 59, 999);
+
+    let startDateRecent, endDateRecent, startDateComparison, endDateComparison;
+
+    switch (dateRange) {
+      case "lastTwoWeeks":
+        endDateRecent = new Date(yesterdayMidnight);
+        startDateRecent = new Date(endDateRecent);
+        startDateRecent.setDate(startDateRecent.getDate() - 14);
+
+        endDateComparison = new Date(startDateRecent);
+        endDateComparison.setDate(endDateComparison.getDate() - 1);
+        startDateComparison = new Date(endDateComparison);
+        startDateComparison.setDate(startDateComparison.getDate() - 364);
+        break;
+      case "lastMonth":
+        endDateRecent = new Date(yesterdayMidnight);
+        startDateRecent = new Date(endDateRecent);
+        startDateRecent.setDate(startDateRecent.getDate() - 28);
+
+        endDateComparison = new Date(startDateRecent);
+        endDateComparison.setDate(endDateComparison.getDate() - 1);
+        startDateComparison = new Date(endDateComparison);
+        startDateComparison.setDate(startDateComparison.getDate() - 364);
+        break;
+      case "yearToDate":
+        endDateRecent = new Date(yesterdayMidnight);
+        startDateRecent = new Date(endDateRecent.getFullYear(), 0, 1);
+
+        endDateComparison = new Date(startDateRecent);
+        endDateComparison.setFullYear(endDateComparison.getFullYear() - 1);
+        startDateComparison = new Date(endDateComparison.getFullYear(), 0, 1);
+
+        break;
+      default:
+        break;
+    }
+
+    setStartDateRecent(startDateRecent);
+    setEndDateRecent(endDateRecent);
+    setStartDateComparison(startDateComparison);
+    setEndDateComparison(endDateComparison);
+  };
 
   const fetchDistrictData = async (district) => {
     setIsLoading(true);
-    const today = new Date().toISOString().split("T")[0] + "T23:59:59";
-    const endpoint = "wg3w-h783.json";
-    let whereClause = `WHERE report_datetime >= '2018-01-01T00:00:00' AND report_datetime <= '${today}'`;
-    if (district) {
-      whereClause += ` AND supervisor_district = '${district}'`;
-    }
-    const query = `
-        SELECT incident_category, date_extract_y(report_datetime) AS year, date_extract_woy(report_datetime) AS week, COUNT(*) AS count 
-        ${whereClause}
-        GROUP BY incident_category, year, week 
-        ORDER BY year, week`;
 
-    const fetchedData = await fetchDataFromAPI(endpoint, query);
-    const { groupedData, metadata } = processData(fetchedData);
-    setAllData(groupedData || []);
-    setMetadata(metadata || {});
+    const supervisorQueryObject = getSupervisorQuery();
+    const supervisorData = await fetchDataFromAPI(supervisorQueryObject);
+    setSelectedSupervisors(supervisorData);
+
+    if (startDateRecent && endDateRecent && startDateComparison && endDateComparison) {
+      const incidentQueryObject = getIncidentQuery(startDateRecent, endDateRecent, startDateComparison, endDateComparison, district);
+      const fetchedData = await fetchDataFromAPI(incidentQueryObject);
+      const { groupedData, metadata } = processData(fetchedData, startDateRecent, endDateRecent, startDateComparison, endDateComparison);
+      setAllData(groupedData || []);
+      setMetadata(metadata || {});
+
+      const crimeDashData = processCrimeData(fetchedData, startDateRecent, endDateRecent, startDateComparison, endDateComparison);
+      setCrimeDashData(crimeDashData);
+
+      const districtGeoJsonData = {
+        type: "FeatureCollection",
+        features: supervisorData.map((item) => ({
+          type: "Feature",
+          properties: {
+            district: item.sup_dist_num,
+            supervisor: item.sup_name,
+          },
+          geometry: item.multipolygon,
+        })).filter(feature => feature !== null),
+      };
+      setDistrictData(districtGeoJsonData);
+    } else {
+      console.error("One or more date variables are null");
+    }
+
     setIsLoading(false);
   };
 
   const handleAnomalyClick = async (anomaly) => {
-    const today = new Date().toISOString().split("T")[0] + "T23:59:59";
-    const oneMonthAgo = new Date();
-    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-    const fromDate = oneMonthAgo.toISOString().split("T")[0] + "T00:00:00";
+    const toDate = new Date().toISOString().split("T")[0] + "T23:59:59";
+    const fromDate = new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().split("T")[0] + "T00:00:00";
 
-    const endpoint = "wg3w-h783.json";
-    const whereClause = `report_datetime >= '${fromDate}' AND report_datetime <= '${today}' AND incident_category = '${anomaly.category}'`;
-    const query = `
-      SELECT Intersection, COUNT(*) as count
-      WHERE ${whereClause}
-      GROUP BY Intersection
-      ORDER BY count DESC`;
-
-    const fetchedIncidentData = await fetchDataFromAPI(endpoint, query);
+    const fetchedIncidentData = await fetchDataFromAPI(getAnomalyQuery(fromDate, toDate, anomaly.category));
     setIncidentData(fetchedIncidentData || []);
   };
 
-  const handleDistrictClick = (district) => {
-    setSelectedDistrict(district); // Set the selected district
+  const handleDateRangeChange = (event, newRange) => {
+    if (newRange !== null) {
+      setDateRange(newRange);
+    }
   };
 
   return (
-    <div>
-      <h2>{district ? `District ${district}` : "Citywide"}</h2>
-      <MapComponent intersectionData={incidentData} onDistrictClick={handleDistrictClick} />{" "}
-      {/* Pass incidentData to MapComponent */}
-      <nav className="sub-nav">
-        <button
-          className={activeTab === "anomalies" ? "active-tab" : ""}
-          onClick={() => setActiveTab("anomalies")}
-        >
-          Anomalies
-        </button>
-        <button
-          className={activeTab === "charts" ? "active-tab" : ""}
-          onClick={() => setActiveTab("charts")}
-        >
-          Charts
-        </button>
-      </nav>
-      <div className="tab-content">
-        {activeTab === "charts" &&
-          (isLoading ? (
-            <div>Loading...</div>
+    <Box>
+      <Box>
+        <Typography variant="h4" gutterBottom>
+          {district ? `District ${district}` : "Citywide"}
+        </Typography>
+        <Box display="flex" alignItems="center" mb={2}>
+          {district ? (
+            <Typography variant="h6" gutterBottom>
+              {`Supervisor: ${districtData?.features.find(feature => feature.properties.district === district)?.properties.supervisor || ''}`}
+            </Typography>
           ) : (
-            <ErrorBarCharts data={allData} />
-          ))}
-        {activeTab === "anomalies" && (
-          <AnomalyDisplay
-            data={allData}
-            metadata={metadata}
-            district={district}
-            onAnomalyClick={handleAnomalyClick}
-          />
+            <>
+              <Box mr={2}>
+                <img 
+                  src="https://www.sf.gov/sites/default/files/styles/profile/public/2022-11/London%20Breed%20headshot.jpg?itok=A9k60vD-" 
+                  alt="Mayor London Breed" 
+                  style={{ width: "100px", height: "auto", borderRadius: "50%" }}
+                />
+              </Box>
+              <Typography variant="h6" gutterBottom>
+                Mayor London Breed
+              </Typography>
+            </>
+          )}
+        </Box>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <ToggleButtonGroup
+            value={dateRange}
+            exclusive
+            onChange={handleDateRangeChange}
+            aria-label="date range"
+          >
+            <ToggleButton value="lastTwoWeeks" aria-label="last two weeks">
+              Last Two Weeks
+            </ToggleButton>
+            <ToggleButton value="lastMonth" aria-label="last month">
+              Last Month
+            </ToggleButton>
+            <ToggleButton value="yearToDate" aria-label="year to date">
+              Year to Date
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+      </Box>
+      <Tabs
+        value={activeTab}
+        onChange={(e, newValue) => setActiveTab(newValue)}
+        indicatorColor="primary"
+        textColor="primary"
+        variant="fullWidth"
+      >
+        <Tab value="dashboard" label="Dashboard" />
+        <Tab value="details" label="Details" />
+        <Tab value="alerts" label="Alerts" />
+      </Tabs>
+      <Box mt={2}>
+        {activeTab === "dashboard" && (isLoading ? <CircularProgress /> : <CrimeDash data={crimeDashData} metadata={metadata} districtData={districtData} />)}
+        {activeTab === "details" && (isLoading ? <CircularProgress /> : <ErrorBarCharts data={allData} metadata={metadata} />)}
+        {activeTab === "alerts" && (
+          <AnomalyDisplay data={allData} metadata={metadata} district={district} onAnomalyClick={handleAnomalyClick} />
         )}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }
 
