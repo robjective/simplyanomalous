@@ -6,17 +6,11 @@ function ErrorBarCharts({ data, metadata }) {
   const [plots, setPlots] = useState([]);
 
   useEffect(() => {
-    console.log("ErrorBarCharts Data:", data);
     if (data && Object.keys(data).length > 0) {
       const { statistics } = calculateStatisticsAndAnomalies(data);
-      console.log("Statistics:", statistics); // Debugging log
       setPlots(createPlots(statistics, metadata));
     }
   }, [data]);
-
-  const filterDates = (entries, startDate, endDate) => {
-    return entries.filter(entry => entry.date >= startDate && entry.date <= endDate);
-  };
 
   const createPlots = (statistics, metadata) => {
     if (!metadata) {
@@ -24,25 +18,25 @@ function ErrorBarCharts({ data, metadata }) {
       return [];
     }
 
-    const { recentStart, recentEnd, comparisonStart, comparisonEnd } = metadata;
+    const standardizedYear = "2000"; // Standard year for X-axis visualization
 
-    return statistics.map(({ category, entries, recentAvg, comparisonAvg, recentStdDev, comparisonStdDev }) => {
-      if (!Array.isArray(entries)) {
-        console.error("Entries is not an array:", entries); // Debugging log
-        return null; // Skip invalid entries
-      }
+    const standardizeDate = (date) => {
+      const newDate = new Date(date);
+      newDate.setFullYear(standardizedYear);
+      return newDate.toISOString().substring(0, 10); // Adjust to standard year
+    };
 
-      const xValues = entries.map((entry) => entry.date.toISOString().substring(0, 10));
-      const yValues = entries.map((entry) => entry.count);
+    return statistics.map(({ category, entries }) => {
+      // Map entries to a standardized year format and sort them
+      const entriesWithStandardYear = entries.map(entry => ({
+        ...entry,
+        date: standardizeDate(entry.date),
+        period: entry.date >= metadata.recentStart && entry.date <= metadata.recentEnd ? 'Recent' : 'Comparison'
+      })).sort((a, b) => new Date(a.date) - new Date(b.date));
 
-      const recentFilteredEntries = filterDates(entries, recentStart, recentEnd);
-      const comparisonFilteredEntries = filterDates(entries, comparisonStart, comparisonEnd);
-
-      const recentXValues = recentFilteredEntries.map((entry) => entry.date.toISOString().substring(0, 10));
-      const comparisonXValues = comparisonFilteredEntries.map((entry) => entry.date.toISOString().substring(0, 10));
-
-      console.log("Creating plot for category:", category); // Debugging log
-      console.log("recentAvg:", recentAvg, "comparisonAvg:", comparisonAvg, "recentStdDev:", recentStdDev, "comparisonStdDev:", comparisonStdDev); // Debugging log
+      // Filter and sort by period
+      const recentEntries = entriesWithStandardYear.filter(entry => entry.period === 'Recent');
+      const comparisonEntries = entriesWithStandardYear.filter(entry => entry.period === 'Comparison');
 
       return (
         <Plot
@@ -51,76 +45,28 @@ function ErrorBarCharts({ data, metadata }) {
             {
               type: "scatter",
               mode: "lines+markers",
-              x: xValues,
-              y: yValues,
-              name: category,
-              marker: { size: 4 },
+              x: recentEntries.map(entry => entry.date),
+              y: recentEntries.map(entry => entry.count),
+              marker: { color: 'orange' },
+              name: 'Recent'
             },
             {
               type: "scatter",
-              mode: "lines",
-              x: comparisonXValues,
-              y: Array(comparisonXValues.length).fill(comparisonAvg),
-              name: "Comparison Avg",
-              line: { color: "blue" },
-            },
-            {
-              type: "scatter",
-              mode: "lines",
-              x: comparisonXValues,
-              y: Array(comparisonXValues.length).fill(comparisonAvg + comparisonStdDev),
-              name: "+1 Std Dev (Comparison)",
-              line: { color: "green" },
-              fill: "tonexty",
-              fillcolor: "rgba(0, 255, 0, 0.3)",
-            },
-            {
-              type: "scatter",
-              mode: "lines",
-              x: comparisonXValues,
-              y: Array(comparisonXValues.length).fill(comparisonAvg - comparisonStdDev),
-              name: "-1 Std Dev (Comparison)",
-              line: { color: "red" },
-              fill: "tonexty",
-              fillcolor: "rgba(255, 0, 0, 0.3)",
-            },
-            {
-              type: "scatter",
-              mode: "lines",
-              x: recentXValues,
-              y: Array(recentXValues.length).fill(recentAvg),
-              name: "Recent Avg",
-              line: { color: "purple" },
-            },
-            {
-              type: "scatter",
-              mode: "lines",
-              x: recentXValues,
-              y: Array(recentXValues.length).fill(recentAvg + recentStdDev),
-              name: "+1 Std Dev (Recent)",
-              line: { color: "orange" },
-              fill: "tonexty",
-              fillcolor: "rgba(255, 165, 0, 0.3)",
-            },
-            {
-              type: "scatter",
-              mode: "lines",
-              x: recentXValues,
-              y: Array(recentXValues.length).fill(recentAvg - recentStdDev),
-              name: "-1 Std Dev (Recent)",
-              line: { color: "yellow" },
-              fill: "tonexty",
-              fillcolor: "rgba(255, 255, 0, 0.3)",
-            },
+              mode: "lines+markers",
+              x: comparisonEntries.map(entry => entry.date),
+              y: comparisonEntries.map(entry => entry.count),
+              marker: { color: 'blue' },
+              name: 'Comparison'
+            }
           ]}
           layout={{
             title: category,
-            xaxis: { title: "Date" },
-            yaxis: { title: "Count" },
-            showlegend: false,
-            width: 300,
-            height: 200,
-            margin: { l: 40, r: 10, t: 40, b: 30 },
+            xaxis: { title: "Day of the Year", tickformat: "%b %d", type: "date", range: [`${standardizedYear}-01-01`, `${standardizedYear}-12-31`] },
+            yaxis: { title: "Count", rangemode: 'tozero' },
+            width: 600,
+            height: 400,
+            margin: { l: 50, r: 50, t: 50, b: 50 },
+            showlegend: false
           }}
         />
       );

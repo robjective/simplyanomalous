@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Crime Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map { height: 300px; width: 50%; }
+    .crime-district {
+      stroke: true;
+      fill: true;
+      fill-opacity: 0.7;
+      weight: 2;
+    }
+  </style>
+</head>
+<body>
+  <h2>Crime Dashboard</h2>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([37.797, -122.442], 14);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    const sampleGeoJson = { 
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: { district: '1.0' },
+          geometry: {
+            type: "Polygon",
+            coordinates: [ [ 
+              [-122.446, 37.800],
+              [-122.446, 37.797],
+              [-122.443, 37.797],
+              [-122.442, 37.800],
+              [-122.446, 37.800]
+            ] ]
+          }
+        },
+        {
+          type: "Feature",
+          properties: { district: '2.0' },
+          geometry: {
+            type: "Polygon",
+            coordinates: [ [ 
+              [-122.441, 37.798],
+              [-122.441, 37.795],
+              [-122.437, 37.795],
+              [-122.437, 37.798],
+              [-122.441, 37.798]
+            ] ]
+          }
+        }
+      ]
+    };
+
+    const colors = { '1.0': 'red', '2.0': 'green' };
+
+    L.geoJSON(sampleGeoJson, {
+      style: (feature) => {
+        return {
+          fillColor: colors[feature.properties.district] || 'gray',
+          className: 'crime-district', // Add a class for styling
+          color: 'white' // Border color
+        };
+      }
+    }).addTo(map);
+
+
+    L.circle([37.798, -122.440], {
+      color: 'red',
+      fillColor: 'red',
+      fillOpacity: 0.2,
+      radius: 200
+    }).addTo(map);
+  </script>
+</body>
+</html>

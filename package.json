@@ -27,6 +27,7 @@
     "chart.js": "^4.4.2",
     "chartjs-adapter-date-fns": "^3.0.0",
     "leaflet": "^1.9.4",
+    "node": "^20.14.0",
     "papaparse": "^5.4.1",
     "plotly.js-basic-dist": "^2.32.0",
     "react-leaflet": "^4.2.1",

@@ -1,0 +1,48 @@
+.map-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center; /* Center the map items */
+}
+
+.map-item {
+  flex: 1 1 300px;
+  color: #333; /* Dark grey text */
+  text-align: center; /* Center text */
+}
+
+.map-item h3 {
+  color: #333; /* Dark grey text for headers */
+}
+
+.map-item p {
+  color: #333; /* Dark grey text for paragraphs */
+}
+
+.map-item table {
+  margin: 0 auto; /* Center the table */
+  color: #333; /* Dark grey text */
+  border-collapse: collapse;
+  width: 100%; /* Ensure the table takes full width */
+}
+
+.map-item table th,
+.map-item table td {
+  border: 1px solid #ddd; /* Add border to table cells */
+  padding: 8px;
+  text-align: center; /* Center text in table cells */
+}
+
+.map-item table th {
+  background-color: #f2f2f2; /* Light grey background for headers */
+  color: #333; /* Dark grey text for headers */
+}
+
+.geojson-style {
+  fill-opacity: 0.7 !important;
+  fill: inherit !important;
+  stroke: inherit !important;
+  stroke-width: inherit !important;
+  stroke-opacity: inherit !important;
+  transition: fill 0.3s !important;
+}

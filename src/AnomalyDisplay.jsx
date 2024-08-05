@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Plot from "react-plotly.js";
 import { calculateStatisticsAndAnomalies } from "./utils/dataProcessing";
-import styles from "./AnomalyDisplay.module.css"; // Import the CSS module
+import styles from "./AnomalyDisplay.module.css";
 import { format } from "date-fns";
 
 function AnomalyDisplay({ data, metadata, district, onAnomalyClick }) {
@@ -9,10 +9,13 @@ function AnomalyDisplay({ data, metadata, district, onAnomalyClick }) {
   const [statistics, setStatistics] = useState([]);
 
   useEffect(() => {
+    console.log('useEffect called');
+    console.log('Data:', data);
+    console.log('Metadata:', metadata);
+    
     if (data && Object.keys(data).length > 0) {
       const results = calculateStatisticsAndAnomalies(data);
       const sortedAnomalies = results.anomalies.sort((a, b) => {
-        // Sorting based on the absolute delta of incidents
         const deltaA = Math.abs(a.recentAvg - a.longTermAvg);
         const deltaB = Math.abs(b.recentAvg - b.longTermAvg);
         return deltaB - deltaA;
@@ -28,23 +31,34 @@ function AnomalyDisplay({ data, metadata, district, onAnomalyClick }) {
 
     const { entries, longTermAvg, stdDev } = stat;
     const plotStartDate = new Date(metadata.longTermStart);
-    const plotEndDate = new Date(metadata.recentEnd); // This includes the recentStart week in the long-term data
+    const plotEndDate = new Date(metadata.recentEnd);
     const recentStartDate = new Date(metadata.recentStart);
     const recentEndDate = new Date(metadata.recentEnd);
 
-    // Filter entries for the long-term range including recentStart week
     const longTermEntries = entries.filter(
-      (entry) => entry.date >= plotStartDate && entry.date <= plotEndDate
+      (entry) => new Date(entry.date) >= plotStartDate && new Date(entry.date) <= plotEndDate
     );
     const recentEntries = entries.filter(
-      (entry) => entry.date >= recentStartDate && entry.date <= recentEndDate
+      (entry) => new Date(entry.date) >= recentStartDate && new Date(entry.date) <= recentEndDate
     );
 
-    const xValuesLongTerm = longTermEntries.map(entry => entry.date.toISOString().substring(0, 10));
-    const yValuesLongTerm = longTermEntries.map(entry => entry.count);
+    const xValuesLongTerm = longTermEntries.map((entry) => entry.date.toISOString().substring(0, 10));
+    const yValuesLongTerm = longTermEntries.map((entry) => entry.count);
 
-    const xValuesRecent = recentEntries.map(entry => entry.date.toISOString().substring(0, 10));
-    const yValuesRecent = recentEntries.map(entry => entry.count);
+    const xValuesRecent = recentEntries.map((entry) => entry.date.toISOString().substring(0, 10));
+    const yValuesRecent = recentEntries.map((entry) => entry.count);
+
+    const xValues = Array.from(new Set([...xValuesLongTerm, ...xValuesRecent])).sort();
+
+    const yValuesLongTermFilled = xValues.map((date) => {
+      const entry = longTermEntries.find((entry) => entry.date.toISOString().substring(0, 10) === date);
+      return entry ? entry.count : null;
+    });
+
+    const yValuesRecentFilled = xValues.map((date) => {
+      const entry = recentEntries.find((entry) => entry.date.toISOString().substring(0, 10) === date);
+      return entry ? entry.count : null;
+    });
 
     return (
       <div className={styles.plotContainer}>
@@ -53,44 +67,45 @@ function AnomalyDisplay({ data, metadata, district, onAnomalyClick }) {
             {
               type: "scatter",
               mode: "lines+markers",
-              x: xValuesLongTerm,
-              y: yValuesLongTerm,
+              x: xValues,
+              y: yValuesLongTermFilled,
               marker: { size: 4, color: "grey" },
+              name: "Long Term",
               showlegend: false,
             },
             {
               type: "scatter",
               mode: "lines+markers",
-              x: xValuesRecent,
-              y: yValuesRecent,
+              x: xValues,
+              y: yValuesRecentFilled,
               marker: { size: 6, color: "gold" },
-              name: `Last ${metadata.recentWeeks} Weeks`,
+              name: `Last ${metadata.recentDays} Days`,
             },
             {
               type: "scatter",
               mode: "lines",
-              x: xValuesLongTerm.concat(xValuesRecent),
-              y: Array(xValuesLongTerm.length + xValuesRecent.length).fill(longTermAvg),
+              x: xValues,
+              y: Array(xValues.length).fill(longTermAvg),
               line: { color: "darkgrey" },
               name: "Normal Range",
             },
             {
               type: "scatter",
               mode: "lines",
-              x: xValuesLongTerm.concat(xValuesRecent),
-              y: Array(xValuesLongTerm.length + xValuesRecent.length).fill(longTermAvg + stdDev),
+              x: xValues,
+              y: Array(xValues.length).fill(longTermAvg + stdDev),
               line: { color: "darkgrey" },
-              fill: 'tonexty',
+              fill: "tonexty",
               fillcolor: "rgba(255, 0, 0, 0.3)",
               showlegend: false,
             },
             {
               type: "scatter",
               mode: "lines",
-              x: xValuesLongTerm.concat(xValuesRecent),
-              y: Array(xValuesLongTerm.length + xValuesRecent.length).fill(longTermAvg - stdDev),
+              x: xValues,
+              y: Array(xValues.length).fill(longTermAvg - stdDev),
               line: { color: "darkgrey" },
-              fill: 'tonexty',
+              fill: "tonexty",
               fillcolor: "rgba(0, 128, 0, 0.3)",
               showlegend: false,
             },
@@ -104,7 +119,7 @@ function AnomalyDisplay({ data, metadata, district, onAnomalyClick }) {
             yaxis: {
               title: "Police Reports Per Week",
               titlefont: { standoff: 10 },
-              range: [0, Math.max(...yValuesLongTerm.concat(yValuesRecent)) + stdDev],
+              range: [0, Math.max(...yValuesLongTerm.concat(yValuesRecent).filter(y => y !== null)) + stdDev],
             },
           }}
           useResizeHandler={true}
@@ -115,7 +130,6 @@ function AnomalyDisplay({ data, metadata, district, onAnomalyClick }) {
     );
   };
 
-
   return (
     <div className={styles.anomalyContainer}>
       {anomalies.length > 0 ? (
@@ -123,9 +137,7 @@ function AnomalyDisplay({ data, metadata, district, onAnomalyClick }) {
           <div
             key={index}
             className={`${styles.anomalyItem} ${
-              anomaly.recentAvg > anomaly.longTermAvg
-                ? styles.positive
-                : styles.negative
+              anomaly.recentAvg > anomaly.longTermAvg ? styles.positive : styles.negative
             }`}
             onClick={() => onAnomalyClick(anomaly)}
           >
@@ -155,8 +167,8 @@ function getText(anomaly, metadata) {
   }
 
   try {
-    const recentPeriodEndFormatted = format(metadata.recentEnd, 'MMM dd');
-    const recentPeriodStartFormatted = format(metadata.recentStart, 'MMM dd');
+    const recentPeriodEndFormatted = format(new Date(metadata.recentEnd), 'MMM dd');
+    const recentPeriodStartFormatted = format(new Date(metadata.recentStart), 'MMM dd');
     const { recentAvg, longTermAvg, previousYearAvg, yoyChange } = anomaly;
     const diff = Math.round((Math.abs(longTermAvg - recentAvg) / longTermAvg) * 100);
     const trend = recentAvg > longTermAvg ? "more" : "less";

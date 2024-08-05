@@ -77,24 +77,3 @@ nav a.active {
   line-height: 1; /* Ensure the badge has a single line height */
 }
 
-/* Map container styling */
-#map {
-  height: 500px;
-}
-
-/* Leaflet map adjustments */
-.leaflet-container {
-  @apply bg-gray-100;
-}
-
-.leaflet-interactive {
-  stroke: #000000; /* Very light line color for district boundaries */
-  stroke-width: 1; /* Thin line */
-  fill: none;
-  transition: fill 0.3s;
-}
-
-.leaflet-interactive:hover {
-  fill: #000000;
-  fill-opacity: 0.1; /* Very light opacity on hover */
-}

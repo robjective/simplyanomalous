@@ -3,7 +3,7 @@ import ErrorBarCharts from "./ErrorBarCharts";
 import AnomalyDisplay from "./AnomalyDisplay";
 import CrimeDash from "./CrimeDash";
 import { fetchDataFromAPI } from "./utils/api";
-import { getSupervisorQuery, getIncidentQuery, getAnomalyQuery } from "./utils/queries";
+import { getSupervisorQuery, getIncidentQuery, getAnomalyQuery, getCategoryComparisonQuery } from "./utils/queries";
 import { processData } from "./utils/dataProcessing";
 import { processCrimeData } from "./utils/crimeDataProcessing";
 import { CircularProgress, Box, Typography, Tabs, Tab, ToggleButton, ToggleButtonGroup } from '@mui/material';
@@ -40,34 +40,50 @@ function TabContent({ district, setSelectedSupervisors }) {
     yesterdayMidnight.setDate(yesterdayMidnight.getDate() - 1);
     yesterdayMidnight.setHours(23, 59, 59, 999);
 
-    let startDateRecent, endDateRecent, startDateComparison, endDateComparison;
+    let startDateRecent, endDateRecent, startDateComparison, endDateComparison, startDateAlert, endDateAlert
 
     switch (dateRange) {
       case "lastTwoWeeks":
-        endDateRecent = new Date(yesterdayMidnight);
-        startDateRecent = new Date(endDateRecent);
-        startDateRecent.setDate(startDateRecent.getDate() - 14);
-
-        endDateComparison = new Date(startDateRecent);
-        endDateComparison.setDate(endDateComparison.getDate() - 1);
-        startDateComparison = new Date(endDateComparison);
-        startDateComparison.setDate(startDateComparison.getDate() - 364);
+        const MS_PER_DAY = 24 * 60 * 60 * 1000;
+        const today = new Date(yesterdayMidnight);
+        
+        // Get the current day of the week (0 is Sunday, 6 is Saturday)
+        const dayOfWeek = today.getDay();
+        
+        // Calculate the most recent Sunday (start of the week)
+        const recentSunday = new Date(today - dayOfWeek * MS_PER_DAY);
+        
+        // Calculate the start of the most recent full two weeks (14 days ago from the recent Sunday)
+        startDateRecent = new Date(recentSunday - 14 * MS_PER_DAY);
+        
+        // The end of the recent period is the end of the most recent Saturday
+        endDateRecent = new Date(recentSunday - 1 * MS_PER_DAY);
+        
+        // Calculate the start and end dates for the comparison period (same weeks last year)
+        startDateComparison = new Date(startDateRecent);
+        startDateComparison.setFullYear(startDateComparison.getFullYear() - 1);
+        
+        endDateComparison = new Date(endDateRecent);
+        endDateComparison.setFullYear(endDateComparison.getFullYear() - 1);
         break;
       case "lastMonth":
         endDateRecent = new Date(yesterdayMidnight);
         startDateRecent = new Date(endDateRecent);
         startDateRecent.setDate(startDateRecent.getDate() - 28);
 
-        endDateComparison = new Date(startDateRecent);
-        endDateComparison.setDate(endDateComparison.getDate() - 1);
-        startDateComparison = new Date(endDateComparison);
-        startDateComparison.setDate(startDateComparison.getDate() - 364);
+        endDateComparison = new Date(endDateRecent);
+        endDateComparison.setFullYear(endDateComparison.getFullYear() - 1);
+        
+        startDateComparison = new Date(startDateRecent);
+        startDateComparison.setFullYear(endDateRecent.getFullYear() - 1);
+        console.log("startDateComparison",startDateComparison);
+        console.log("endDateComparison",endDateComparison);
         break;
       case "yearToDate":
         endDateRecent = new Date(yesterdayMidnight);
         startDateRecent = new Date(endDateRecent.getFullYear(), 0, 1);
 
-        endDateComparison = new Date(startDateRecent);
+        endDateComparison = new Date(endDateRecent);
         endDateComparison.setFullYear(endDateComparison.getFullYear() - 1);
         startDateComparison = new Date(endDateComparison.getFullYear(), 0, 1);
 
@@ -94,11 +110,11 @@ function TabContent({ district, setSelectedSupervisors }) {
       const fetchedData = await fetchDataFromAPI(incidentQueryObject);
       const { groupedData, metadata } = processData(fetchedData, startDateRecent, endDateRecent, startDateComparison, endDateComparison);
       setAllData(groupedData || []);
+      console.log('allData:', groupedData);
       setMetadata(metadata || {});
-
-      const crimeDashData = processCrimeData(fetchedData, startDateRecent, endDateRecent, startDateComparison, endDateComparison);
-      setCrimeDashData(crimeDashData);
-
+      const crimeDashObject = getCategoryComparisonQuery(startDateRecent, endDateRecent, startDateComparison, endDateComparison);
+      const crimeDashData = await fetchDataFromAPI(crimeDashObject);
+      setCrimeDashData(crimeDashData || []);
       const districtGeoJsonData = {
         type: "FeatureCollection",
         features: supervisorData.map((item) => ({
@@ -128,6 +144,7 @@ function TabContent({ district, setSelectedSupervisors }) {
 
   const handleDateRangeChange = (event, newRange) => {
     if (newRange !== null) {
+      setIsLoading(true); // Turn on loading indicator
       setDateRange(newRange);
     }
   };
@@ -177,6 +194,7 @@ function TabContent({ district, setSelectedSupervisors }) {
           </ToggleButtonGroup>
         </Box>
       </Box>
+      <h2>Crime Dashboard</h2>
       <Tabs
         value={activeTab}
         onChange={(e, newValue) => setActiveTab(newValue)}
