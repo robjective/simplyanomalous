@@ -1,4 +1,4 @@
-export const getCategoryComparisonQuery = (startDateRecent, endDateRecent, startDateComparison, endDateComparison) => {
+export const getCategoryComparisonQuery = (startDateRecent, endDateRecent, startDateComparison, endDateComparison, district) => {
   const getDaysBetween = (start, end) => {
     const startDate = new Date(start);
     const endDate = new Date(end);
@@ -9,9 +9,13 @@ export const getCategoryComparisonQuery = (startDateRecent, endDateRecent, start
   const daysRecent = getDaysBetween(startDateRecent, endDateRecent);
   const daysComparison = getDaysBetween(startDateComparison, endDateComparison);
 
-  const whereClauseRecent = `report_datetime >= '${startDateRecent.toISOString().replace('Z', '')}' AND report_datetime <= '${endDateRecent.toISOString().replace('Z', '')}'`;
-  const whereClauseComparison = `report_datetime >= '${startDateComparison.toISOString().replace('Z', '')}' AND report_datetime <= '${endDateComparison.toISOString().replace('Z', '')}'`;
-
+  let whereClauseRecent = `report_datetime >= '${startDateRecent.toISOString().replace('Z', '')}' AND report_datetime <= '${endDateRecent.toISOString().replace('Z', '')}'`;
+  let whereClauseComparison = `report_datetime >= '${startDateComparison.toISOString().replace('Z', '')}' AND report_datetime <= '${endDateComparison.toISOString().replace('Z', '')}'`;
+  
+  if (district) {
+    whereClauseRecent += ` AND supervisor_district = '${district}'`;
+    whereClauseComparison += ` AND supervisor_district = '${district}'`;
+  }
   return {
     endpoint: "wg3w-h783.json",
     query: `
@@ -47,11 +51,6 @@ export const getCategoryComparisonQuery = (startDateRecent, endDateRecent, start
       ORDER BY supervisor_district, category_group, incident_category, period`
   };
 };
-
-
-
-
-
 
 
 export const getSupervisorQuery = () => ({

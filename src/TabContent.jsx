@@ -1,38 +1,70 @@
-import React, { useState, useEffect } from "react";
-import ErrorBarCharts from "./ErrorBarCharts";
-import AnomalyDisplay from "./AnomalyDisplay";
-import CrimeDash from "./CrimeDash";
-import { fetchDataFromAPI } from "./utils/api";
-import { getSupervisorQuery, getIncidentQuery, getAnomalyQuery, getCategoryComparisonQuery } from "./utils/queries";
-import { processData } from "./utils/dataProcessing";
-import { processCrimeData } from "./utils/crimeDataProcessing";
-import { CircularProgress, Box, Typography, Tabs, Tab, ToggleButton, ToggleButtonGroup } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import ErrorBarCharts from './ErrorBarCharts';
+import AnomalyDisplay from './AnomalyDisplay';
+import CrimeDash from './CrimeDash';
+import { fetchDataFromAPI } from './utils/api';
+import {
+  getSupervisorQuery,
+  getIncidentQuery,
+  getCategoryComparisonQuery,
+} from './utils/queries';
+import { processData } from './utils/dataProcessing';
+import {
+  CircularProgress,
+  Box,
+  Typography,
+  ToggleButton,
+  ToggleButtonGroup,
+} from '@mui/material';
 
-function TabContent({ district, setSelectedSupervisors }) {
+function TabContent({
+  district,
+  setSelectedSupervisors,
+  activeTab = 'dashboard',
+}) {
   const [allData, setAllData] = useState([]);
   const [crimeDashData, setCrimeDashData] = useState([]);
   const [districtData, setDistrictData] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // Single loading state
   const [metadata, setMetadata] = useState({});
-  const [activeTab, setActiveTab] = useState("dashboard");
   const [incidentData, setIncidentData] = useState([]);
-  const [dateRange, setDateRange] = useState("lastTwoWeeks");
+  const [dateRange, setDateRange] = useState('lastTwoWeeks');
   const [startDateRecent, setStartDateRecent] = useState(new Date());
   const [endDateRecent, setEndDateRecent] = useState(new Date());
   const [startDateComparison, setStartDateComparison] = useState(new Date());
   const [endDateComparison, setEndDateComparison] = useState(new Date());
 
-  useEffect(() => {
-    setActiveTab("dashboard");
-  }, [district]);
-
+  // Set initial dates when dateRange changes
   useEffect(() => {
     setInitialDates();
   }, [dateRange]);
 
+  // Fetch data when dependencies change
   useEffect(() => {
-    fetchDistrictData(district);
-  }, [district, dateRange, startDateRecent, endDateRecent, startDateComparison, endDateComparison]);
+    const fetchData = async () => {
+      console.log('Starting data fetch, setting isLoading to true');
+      setIsLoading(true); // Set loading state to true at the start
+      try {
+        await fetchDistrictData(district);
+      } finally {
+         // Check if isLoading is already false before setting it to false again
+         if (!isLoading) {
+          console.warn('isLoading is already false, but attempting to set to false again.');
+        } else {
+          console.log('Data fetch complete, setting isLoading to false');
+          setIsLoading(false); // Set loading state to false after fetching is done
+        }
+      }
+    };
+    fetchData();
+  }, [
+    district,
+    dateRange,
+    startDateRecent,
+    endDateRecent,
+    startDateComparison,
+    endDateComparison,
+  ]);
 
   const setInitialDates = () => {
     const today = new Date();
@@ -40,54 +72,56 @@ function TabContent({ district, setSelectedSupervisors }) {
     yesterdayMidnight.setDate(yesterdayMidnight.getDate() - 1);
     yesterdayMidnight.setHours(23, 59, 59, 999);
 
-    let startDateRecent, endDateRecent, startDateComparison, endDateComparison, startDateAlert, endDateAlert
+    let startDateRecent,
+      endDateRecent,
+      startDateComparison,
+      endDateComparison;
 
     switch (dateRange) {
-      case "lastTwoWeeks":
+      case 'lastTwoWeeks':
         const MS_PER_DAY = 24 * 60 * 60 * 1000;
-        const today = new Date(yesterdayMidnight);
-        
-        // Get the current day of the week (0 is Sunday, 6 is Saturday)
-        const dayOfWeek = today.getDay();
-        
-        // Calculate the most recent Sunday (start of the week)
-        const recentSunday = new Date(today - dayOfWeek * MS_PER_DAY);
-        
-        // Calculate the start of the most recent full two weeks (14 days ago from the recent Sunday)
-        startDateRecent = new Date(recentSunday - 14 * MS_PER_DAY);
-        
-        // The end of the recent period is the end of the most recent Saturday
-        endDateRecent = new Date(recentSunday - 1 * MS_PER_DAY);
-        
-        // Calculate the start and end dates for the comparison period (same weeks last year)
+
+        // Get the date of the most recent Saturday
+        const recentSaturday = new Date(yesterdayMidnight);
+        recentSaturday.setDate(
+          recentSaturday.getDate() - ((recentSaturday.getDay() + 1) % 7)
+        );
+
+        // Set start and end dates for the recent period
+        startDateRecent = new Date(recentSaturday);
+        startDateRecent.setDate(startDateRecent.getDate() - 13);
+
+        endDateRecent = new Date(recentSaturday);
+
+        // Set start and end dates for the comparison period (same weeks last year)
         startDateComparison = new Date(startDateRecent);
         startDateComparison.setFullYear(startDateComparison.getFullYear() - 1);
-        
+
         endDateComparison = new Date(endDateRecent);
         endDateComparison.setFullYear(endDateComparison.getFullYear() - 1);
         break;
-      case "lastMonth":
+
+      case 'lastMonth':
         endDateRecent = new Date(yesterdayMidnight);
         startDateRecent = new Date(endDateRecent);
         startDateRecent.setDate(startDateRecent.getDate() - 28);
 
         endDateComparison = new Date(endDateRecent);
         endDateComparison.setFullYear(endDateComparison.getFullYear() - 1);
-        
+
         startDateComparison = new Date(startDateRecent);
-        startDateComparison.setFullYear(endDateRecent.getFullYear() - 1);
-        console.log("startDateComparison",startDateComparison);
-        console.log("endDateComparison",endDateComparison);
+        startDateComparison.setFullYear(startDateComparison.getFullYear() - 1);
         break;
-      case "yearToDate":
+
+      case 'yearToDate':
         endDateRecent = new Date(yesterdayMidnight);
         startDateRecent = new Date(endDateRecent.getFullYear(), 0, 1);
 
         endDateComparison = new Date(endDateRecent);
         endDateComparison.setFullYear(endDateComparison.getFullYear() - 1);
         startDateComparison = new Date(endDateComparison.getFullYear(), 0, 1);
-
         break;
+
       default:
         break;
     }
@@ -99,52 +133,73 @@ function TabContent({ district, setSelectedSupervisors }) {
   };
 
   const fetchDistrictData = async (district) => {
-    setIsLoading(true);
+    try {
+      console.log('Fetching supervisor data');
+      const supervisorData = await fetchDataFromAPI(getSupervisorQuery());
+      setSelectedSupervisors(supervisorData);
 
-    const supervisorQueryObject = getSupervisorQuery();
-    const supervisorData = await fetchDataFromAPI(supervisorQueryObject);
-    setSelectedSupervisors(supervisorData);
+      console.log('Fetching incident and comparison data');
+      // Fetch all data concurrently and wait for all requests to finish
+      const [incidentData, crimeDashData] = await Promise.all([
+        fetchDataFromAPI(
+          getIncidentQuery(
+            startDateRecent,
+            endDateRecent,
+            startDateComparison,
+            endDateComparison,
+            district
+          )
+        ),
+        fetchDataFromAPI(
+          getCategoryComparisonQuery(
+            startDateRecent,
+            endDateRecent,
+            startDateComparison,
+            endDateComparison,
+            district
+          )
+        ),
+      ]);
 
-    if (startDateRecent && endDateRecent && startDateComparison && endDateComparison) {
-      const incidentQueryObject = getIncidentQuery(startDateRecent, endDateRecent, startDateComparison, endDateComparison, district);
-      const fetchedData = await fetchDataFromAPI(incidentQueryObject);
-      const { groupedData, metadata } = processData(fetchedData, startDateRecent, endDateRecent, startDateComparison, endDateComparison);
+      // Process and set incident data
+      console.log('Processing incident data');
+      const { groupedData, metadata } = processData(
+        incidentData,
+        startDateRecent,
+        endDateRecent,
+        startDateComparison,
+        endDateComparison
+      );
       setAllData(groupedData || []);
-      console.log('allData:', groupedData);
       setMetadata(metadata || {});
-      const crimeDashObject = getCategoryComparisonQuery(startDateRecent, endDateRecent, startDateComparison, endDateComparison);
-      const crimeDashData = await fetchDataFromAPI(crimeDashObject);
+
+      // Set crime dashboard data
+      console.log('Setting crime dashboard data');
       setCrimeDashData(crimeDashData || []);
+
+      // Create and set district GeoJSON data
+      console.log('Setting district GeoJSON data');
       const districtGeoJsonData = {
-        type: "FeatureCollection",
-        features: supervisorData.map((item) => ({
-          type: "Feature",
-          properties: {
-            district: item.sup_dist_num,
-            supervisor: item.sup_name,
-          },
-          geometry: item.multipolygon,
-        })).filter(feature => feature !== null),
+        type: 'FeatureCollection',
+        features: supervisorData
+          .map((item) => ({
+            type: 'Feature',
+            properties: {
+              district: item.sup_dist_num,
+              supervisor: item.sup_name,
+            },
+            geometry: item.multipolygon,
+          }))
+          .filter((feature) => feature !== null),
       };
       setDistrictData(districtGeoJsonData);
-    } else {
-      console.error("One or more date variables are null");
+    } catch (error) {
+      console.error('Error fetching district data:', error);
     }
-
-    setIsLoading(false);
-  };
-
-  const handleAnomalyClick = async (anomaly) => {
-    const toDate = new Date().toISOString().split("T")[0] + "T23:59:59";
-    const fromDate = new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().split("T")[0] + "T00:00:00";
-
-    const fetchedIncidentData = await fetchDataFromAPI(getAnomalyQuery(fromDate, toDate, anomaly.category));
-    setIncidentData(fetchedIncidentData || []);
   };
 
   const handleDateRangeChange = (event, newRange) => {
     if (newRange !== null) {
-      setIsLoading(true); // Turn on loading indicator
       setDateRange(newRange);
     }
   };
@@ -153,20 +208,29 @@ function TabContent({ district, setSelectedSupervisors }) {
     <Box>
       <Box>
         <Typography variant="h4" gutterBottom>
-          {district ? `District ${district}` : "Citywide"}
+            {district ? `District ${Math.floor(district)}` : 'Citywide'} Crime Dashboard
         </Typography>
+        
         <Box display="flex" alignItems="center" mb={2}>
           {district ? (
             <Typography variant="h6" gutterBottom>
-              {`Supervisor: ${districtData?.features.find(feature => feature.properties.district === district)?.properties.supervisor || ''}`}
+              {`Supervisor: ${
+                districtData?.features.find(
+                  (feature) => feature.properties.district === district
+                )?.properties.supervisor || ''
+              }`}
             </Typography>
           ) : (
             <>
               <Box mr={2}>
-                <img 
-                  src="https://www.sf.gov/sites/default/files/styles/profile/public/2022-11/London%20Breed%20headshot.jpg?itok=A9k60vD-" 
-                  alt="Mayor London Breed" 
-                  style={{ width: "100px", height: "auto", borderRadius: "50%" }}
+                <img
+                  src="https://www.sf.gov/sites/default/files/styles/profile/public/2022-11/London%20Breed%20headshot.jpg?itok=A9k60vD-"
+                  alt="Mayor London Breed"
+                  style={{
+                    width: '100px',
+                    height: 'auto',
+                    borderRadius: '50%',
+                  }}
                 />
               </Box>
               <Typography variant="h6" gutterBottom>
@@ -175,6 +239,8 @@ function TabContent({ district, setSelectedSupervisors }) {
             </>
           )}
         </Box>
+
+        {/* Date Range Toggle */}
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
           <ToggleButtonGroup
             value={dateRange}
@@ -194,23 +260,32 @@ function TabContent({ district, setSelectedSupervisors }) {
           </ToggleButtonGroup>
         </Box>
       </Box>
-      <h2>Crime Dashboard</h2>
-      <Tabs
-        value={activeTab}
-        onChange={(e, newValue) => setActiveTab(newValue)}
-        indicatorColor="primary"
-        textColor="primary"
-        variant="fullWidth"
-      >
-        <Tab value="dashboard" label="Dashboard" />
-        <Tab value="details" label="Details" />
-        <Tab value="alerts" label="Alerts" />
-      </Tabs>
       <Box mt={2}>
-        {activeTab === "dashboard" && (isLoading ? <CircularProgress /> : <CrimeDash data={crimeDashData} metadata={metadata} districtData={districtData} />)}
-        {activeTab === "details" && (isLoading ? <CircularProgress /> : <ErrorBarCharts data={allData} metadata={metadata} />)}
-        {activeTab === "alerts" && (
-          <AnomalyDisplay data={allData} metadata={metadata} district={district} onAnomalyClick={handleAnomalyClick} />
+        {isLoading ? (
+          <div>
+            <CircularProgress />
+            <Typography variant="body1">Loading...</Typography>
+          </div>
+        ) : (
+          <>
+            {activeTab === 'dashboard' && (
+              <CrimeDash
+                data={crimeDashData}
+                metadata={metadata}
+                districtData={districtData}
+              />
+            )}
+            {activeTab === 'details' && (
+              <ErrorBarCharts data={allData} metadata={metadata} />
+            )}
+            {activeTab === 'alerts' && (
+              <AnomalyDisplay
+                data={allData}
+                metadata={metadata}
+                district={district}
+              />
+            )}
+          </>
         )}
       </Box>
     </Box>

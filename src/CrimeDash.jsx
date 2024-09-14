@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import './CrimeDash.css';
 
 function CrimeDash({ data, metadata, districtData }) {
@@ -8,6 +9,7 @@ function CrimeDash({ data, metadata, districtData }) {
   const [incidentCategoryChanges, setIncidentCategoryChanges] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const mapRef = useRef(null);
+  const navigate = useNavigate(); // Initialize useNavigate
 
   useEffect(() => {
     if (Array.isArray(data) && data.length > 0 && metadata && typeof metadata === 'object') {
@@ -159,17 +161,25 @@ function CrimeDash({ data, metadata, districtData }) {
           fillOpacity: 0.7,
         });
 
+        // Add popup information
         const district = parseInt(feature.properties.district, 10);
         const percentChange = percentDifferences[category] && percentDifferences[category][district]
           ? percentDifferences[category][district].percentChange
           : 0;
 
+        // Show only on hover
         layer.bindPopup(`<strong>District: ${district}</strong><br>Change: ${percentChange.toFixed(3)}%`).openPopup();
       },
       mouseout: (e) => {
         const layer = e.target;
         layer.setStyle(style(feature, category));
         layer.closePopup();
+      },
+      click: (e) => {
+        // Handle navigation on click
+        const districtId = feature.properties.district;
+        const supervisorName = feature.properties.supervisor ? feature.properties.supervisor.replace(/\s+/g, "-").toLowerCase() : 'unknown-supervisor'; // Assuming supervisor data exists in properties
+        navigate(`/${supervisorName}/district/${districtId}`);
       },
     });
   };
@@ -266,7 +276,7 @@ function CrimeDash({ data, metadata, districtData }) {
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                   />
                   <GeoJSON
-                    data={districtData}   
+                    data={districtData}
                     style={(feature) => style(feature, category)}
                     onEachFeature={(feature, layer) => onEachFeature(feature, layer, category)}
                   />

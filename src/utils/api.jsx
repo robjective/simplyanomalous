@@ -1,5 +1,5 @@
 // utils/api.js
-export const fetchDataFromAPI = async (queryObject) => {
+export const fetchDataFromAPI = async (queryObject, updateLoadingCount) => {
   const baseUrl = "https://data.sfgov.org/resource/";
   let allData = [];
   let limit = 1000; // Set the limit for each request
@@ -20,6 +20,7 @@ export const fetchDataFromAPI = async (queryObject) => {
     console.log("URL being requested:", url.href); // Debug output
 
     try {
+      if (updateLoadingCount) updateLoadingCount(1); // Increment loading count
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -35,6 +36,8 @@ export const fetchDataFromAPI = async (queryObject) => {
     } catch (error) {
       console.error("Failed to fetch data:", error);
       return null; // Return null or appropriate error handling
+    } finally {
+      if (updateLoadingCount) updateLoadingCount(-1); // Decrement loading count
     }
   }
 

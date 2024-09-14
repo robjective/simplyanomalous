@@ -3,11 +3,13 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { fetchDataFromAPI } from "./utils/api";
 import { getSupervisorQuery } from "./utils/queries";
+import { useNavigate } from "react-router-dom";
 
-const MapComponent = ({ intersectionData, onDistrictClick }) => {
+const MapComponent = ({ intersectionData }) => {
   const mapRef = useRef(null);
   const markersRef = useRef([]);
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
 
   const fetchDistrictData = async () => {
     setIsLoading(true);
@@ -17,23 +19,25 @@ const MapComponent = ({ intersectionData, onDistrictClick }) => {
       const data = await fetchDataFromAPI(queryObject);
       const geoJsonData = {
         type: "FeatureCollection",
-        features: data.map((item) => {
-          let geometry;
-          try {
-            geometry = item.multipolygon;
-          } catch (error) {
-            console.error("Error parsing multipolygon:", error, item.multipolygon);
-            return null;
-          }
-          return {
-            type: "Feature",
-            properties: {
-              district: item.sup_dist_num,
-              supervisor: item.sup_name,
-            },
-            geometry,
-          };
-        }).filter(feature => feature !== null),
+        features: data
+          .map((item) => {
+            let geometry;
+            try {
+              geometry = item.multipolygon;
+            } catch (error) {
+              console.error("Error parsing multipolygon:", error, item.multipolygon);
+              return null;
+            }
+            return {
+              type: "Feature",
+              properties: {
+                district: item.sup_dist_num,
+                supervisor: item.sup_name,
+              },
+              geometry,
+            };
+          })
+          .filter((feature) => feature !== null),
       };
 
       if (mapRef.current) {
@@ -44,12 +48,14 @@ const MapComponent = ({ intersectionData, onDistrictClick }) => {
             fillOpacity: 0.2, // Slight fill opacity for better interaction
           }),
           onEachFeature: (feature, layer) => {
-            layer.bindPopup(`
-              <div>
-                <strong>District:</strong> ${feature.properties.district}<br>
-                <strong>Supervisor:</strong> ${feature.properties.supervisor}
-              </div>
-            `);
+            // Remove bindPopup to avoid showing a comment bubble
+            // layer.bindPopup(`
+            //   <div>
+            //     <strong>District:</strong> ${feature.properties.district}<br>
+            //     <strong>Supervisor:</strong> ${feature.properties.supervisor}
+            //   </div>
+            // `);
+
             layer.on({
               mouseover: (e) => {
                 e.target.setStyle({
@@ -63,10 +69,14 @@ const MapComponent = ({ intersectionData, onDistrictClick }) => {
                 });
               },
               click: (e) => {
+                // Log for debugging if needed
                 console.log("Feature clicked:", feature.properties);
-                const bounds = layer.getBounds();
-                mapRef.current.fitBounds(bounds); // Zoom to the clicked district
-                onDistrictClick(feature.properties.district); // Call the callback with the district number
+
+                const districtId = feature.properties.district;
+                const supervisorName = feature.properties.supervisor.replace(/\s+/g, "-").toLowerCase(); // Format supervisor name
+
+                // Navigate to the supervisor's district URL
+                navigate(`/${supervisorName}/district/${districtId}`);
               },
             });
             if (layer.getElement) {
@@ -109,7 +119,7 @@ const MapComponent = ({ intersectionData, onDistrictClick }) => {
 
       fetchDistrictData();
     }
-  }, [onDistrictClick]);
+  }, []);
 
   useEffect(() => {
     if (mapRef.current && intersectionData && intersectionData.length > 0) {
@@ -120,7 +130,9 @@ const MapComponent = ({ intersectionData, onDistrictClick }) => {
       // Add new markers
       intersectionData.forEach(({ Intersection, count }) => {
         const [street1, street2] = Intersection.split(" \\ ");
-        const geocodeUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(street1 + " & " + street2 + ", San Francisco")}`;
+        const geocodeUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          street1 + " & " + street2 + ", San Francisco"
+        )}`;
 
         fetch(geocodeUrl)
           .then((response) => response.json())
@@ -136,9 +148,7 @@ const MapComponent = ({ intersectionData, onDistrictClick }) => {
               markersRef.current.push(marker);
             }
           })
-          .catch((error) =>
-            console.error("Error fetching geocode data:", error),
-          );
+          .catch((error) => console.error("Error fetching geocode data:", error));
       });
     }
   }, [intersectionData]);
