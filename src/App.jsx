@@ -6,6 +6,7 @@ import {
   useParams,
   useLocation,
 } from "react-router-dom";
+import TopNav from "./TopNav";
 
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import ToggleButton from '@mui/material/ToggleButton';
@@ -27,7 +28,6 @@ function SupervisorRoute({ supervisors, setSelectedSupervisors }) {
     <TabContent
       district={supervisor ? supervisor.sup_dist_num : districtId}
       setSelectedSupervisors={setSelectedSupervisors}
-      activeTab={activeTab}
     />
   );
 }
@@ -66,8 +66,8 @@ function App() {
             <span className="badge">Beta</span>
           </div>
         </header>
-        {/* Supervisor Toggle Button Group - Below Subheader */}
-        <div className="supervisor-toggle" style={{ margin: "20px 0" }}>
+         {/* Supervisor Toggle Button Group - Below Subheader */}
+         <div className="supervisor-toggle" style={{ margin: "20px 0" }}>
           <ToggleButtonGroup
             value={selectedSupervisor}
             exclusive
@@ -188,6 +188,10 @@ function App() {
             }
           />
         </Routes>
+        <TopNav
+          supervisors={supervisors}
+          setSelectedDistrict={setSelectedDistrict}
+        />
         {/* Footer Links */}
         <footer>
           <nav>
