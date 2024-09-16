@@ -14,6 +14,7 @@ body {
 header h1 {
   @apply text-lg m-0;
   display: inline; /* Make sure the h1 is inline */
+  font-size:18pt;
 }
 
 /* Basic styling for navigation container */
@@ -77,3 +78,20 @@ nav a.active {
   line-height: 1; /* Ensure the badge has a single line height */
 }
 
+.supervisor-nav nav {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.supervisor-nav a {
+  text-decoration: none;
+  padding: 5px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.supervisor-nav a.active {
+  background-color: #007bff;
+  color: white;
+}

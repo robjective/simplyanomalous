@@ -27,7 +27,7 @@ function CrimeDash({ data, metadata, districtData }) {
     const incidentCategoryChanges = {
       'Violent Crime': [],
       'Property Crime': [],
-      'Other Crimes': []
+      'Other Crime': []
     };
   
     data.forEach((item) => {
@@ -257,9 +257,11 @@ function CrimeDash({ data, metadata, districtData }) {
       <div className="map-grid">
         {districtData &&
           Object.keys(percentDifferences).length > 0 &&
-          ["Violent Crime", "Property Crime", "Other Crimes"].map((category) => {
-            const percentChange = percentDifferences[category][-1]?.percentChange?.toFixed(1) || 'N/A';
+          ["Violent Crime", "Property Crime", "Other Crime"].map((category) => {
+            let percentChange = percentDifferences[category][-1]?.percentChange?.toFixed(1) || 'N/A';
             const direction = percentChange > 0 ? 'up' : 'down';
+            percentChange=Math.round(Math.abs(percentChange));
+
             return (
               <div className="map-item" key={category} style={getCitywideStyle(category)}>
                 <h3>

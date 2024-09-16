@@ -3,13 +3,119 @@ import Plot from "react-plotly.js";
 import { calculateStatisticsAndAnomalies } from "./utils/dataProcessing";
 import styles from "./AnomalyDisplay.module.css";
 import { format } from "date-fns";
+import { fetchDataFromAPI } from './utils/api';
+import { processData } from './utils/dataProcessing';
 
-function AnomalyDisplay({ data, metadata, district, onAnomalyClick }) {
+
+import {
+  getSupervisorQuery,
+  getIncidentQuery,
+  getCategoryComparisonQuery,
+} from './utils/queries';
+
+function AnomalyDisplay({ district, onAnomalyClick }) {
   const [anomalies, setAnomalies] = useState([]);
   const [statistics, setStatistics] = useState([]);
+  const [startDateRecent, setStartDateRecent] = useState(new Date());
+  const [endDateRecent, setEndDateRecent] = useState(new Date());
+  const [startDateComparison, setStartDateComparison] = useState(new Date());
+  const [endDateComparison, setEndDateComparison] = useState(new Date());
+  const [data, setAllData] = useState([]);
+  const [metadata, setMetadata] = useState({});
 
+
+   // Date Calculation Logic (Move outside useEffect)
+   const calculateDates = () => {
+    const today = new Date();
+    const yesterdayMidnight = new Date(today);
+    yesterdayMidnight.setDate(yesterdayMidnight.getDate() - 1);
+    yesterdayMidnight.setHours(23, 59, 59, 999);
+
+    const calculatedStartDateRecent = new Date(yesterdayMidnight);
+    calculatedStartDateRecent.setDate(calculatedStartDateRecent.getDate() - 14);
+    
+    const calculatedEndDateRecent = new Date(yesterdayMidnight);
+
+    const calculatedEndDateComparison = new Date(calculatedStartDateRecent);
+
+    const calculatedStartDateComparison = new Date(calculatedStartDateRecent);
+    calculatedStartDateComparison.setFullYear(calculatedEndDateComparison.getFullYear() - 1);
+
+
+    return {
+      calculatedStartDateRecent,
+      calculatedEndDateRecent,
+      calculatedStartDateComparison,
+      calculatedEndDateComparison,
+    };
+  };
+
+  // If data is not provided, fetch the data using another useEffect
   useEffect(() => {
-    console.log('useEffect called');
+    if (!data || Object.keys(data).length === 0) {
+      console.log("No data passed in, fetching it");
+
+      const { 
+        calculatedStartDateRecent, 
+        calculatedEndDateRecent, 
+        calculatedStartDateComparison, 
+        calculatedEndDateComparison 
+      } = calculateDates();
+
+      // Set the calculated dates in state
+      setStartDateRecent(calculatedStartDateRecent);
+      setEndDateRecent(calculatedEndDateRecent);
+      setStartDateComparison(calculatedStartDateComparison);
+      setEndDateComparison(calculatedEndDateComparison);
+
+      // Fetch all data concurrently
+      Promise.all([
+        fetchDataFromAPI(
+          getIncidentQuery(
+            calculatedStartDateRecent,
+            calculatedEndDateRecent,
+            calculatedStartDateComparison,
+            calculatedEndDateComparison,
+            district
+          )
+        ),
+        fetchDataFromAPI(
+          getCategoryComparisonQuery(
+            calculatedStartDateRecent,
+            calculatedEndDateRecent,
+            calculatedStartDateComparison,
+            calculatedEndDateComparison,
+            district
+          )
+        ),
+      ]).then(([incidentData, crimeDashData]) => {
+        // Process and set incident data
+        console.log('Processing incident data');
+        const { groupedData, metadata } = processData(
+          incidentData,
+          calculatedStartDateRecent,
+          calculatedEndDateRecent,
+          calculatedStartDateComparison,
+          calculatedEndDateComparison
+        );
+        setAllData(groupedData || []);
+        setMetadata(metadata || {});
+
+        const results = calculateStatisticsAndAnomalies(groupedData);
+        const sortedAnomalies = results.anomalies.sort((a, b) => {
+          const deltaA = Math.abs(a.recentAvg - a.longTermAvg);
+          const deltaB = Math.abs(b.recentAvg - b.longTermAvg);
+          return deltaB - deltaA;
+        });
+        setAnomalies(sortedAnomalies);
+        setStatistics(results.statistics);
+      });
+    }
+  }, [data, district]);
+
+  // Main data processing and setting state
+  useEffect(() => {
+    console.log('useEffect called for data processing');
     console.log('Data:', data);
     console.log('Metadata:', metadata);
     
@@ -25,12 +131,13 @@ function AnomalyDisplay({ data, metadata, district, onAnomalyClick }) {
     }
   }, [data]);
 
+
   const createPlot = (anomaly) => {
     const stat = statistics.find((stat) => stat.category === anomaly.category);
     if (!stat || !stat.entries || stat.entries.length === 0) return null;
 
     const { entries, longTermAvg, stdDev } = stat;
-    const plotStartDate = new Date(metadata.longTermStart);
+    const plotStartDate = new Date(metadata.comparisonStart);
     const plotEndDate = new Date(metadata.recentEnd);
     const recentStartDate = new Date(metadata.recentStart);
     const recentEndDate = new Date(metadata.recentEnd);
@@ -59,7 +166,7 @@ function AnomalyDisplay({ data, metadata, district, onAnomalyClick }) {
       const entry = recentEntries.find((entry) => entry.date.toISOString().substring(0, 10) === date);
       return entry ? entry.count : null;
     });
-
+    
     return (
       <div className={styles.plotContainer}>
         <Plot
@@ -74,7 +181,7 @@ function AnomalyDisplay({ data, metadata, district, onAnomalyClick }) {
               showlegend: false,
             },
             {
-              type: "scatter",
+              type: "scatter", 
               mode: "lines+markers",
               x: xValues,
               y: yValuesRecentFilled,

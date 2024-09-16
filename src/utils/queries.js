@@ -24,7 +24,7 @@ export const getCategoryComparisonQuery = (startDateRecent, endDateRecent, start
         CASE 
           WHEN incident_category IN ('Assault', 'Homicide', 'Rape','Robbery') THEN 'Violent Crime'
           WHEN incident_category IN ('Burglary', 'Malicious Mischief', 'Embezzlement',  'Larceny Theft', 'Stolen Property', 'Vandalism', 'Motor Vehicle Theft', 'Arson') THEN 'Property Crime'
-          ELSE 'Other Crimes'
+          ELSE 'Other Crime'
         END AS category_group,
         SUM(CASE 
           WHEN ${whereClauseRecent} THEN 1 

@@ -1,4 +1,4 @@
-import { parseISO, isWithinInterval } from "date-fns";
+import { parseISO, isWithinInterval, eachDayOfInterval, formatISO } from "date-fns";
 import { getCategoryGroup } from "./categoryMappings.js";
 
 export const processData = (data, recentStart, recentEnd, comparisonStart, comparisonEnd) => {
@@ -17,9 +17,6 @@ export const processData = (data, recentStart, recentEnd, comparisonStart, compa
       yoyChange: 0,
     },
   });
-
-//  console.log('Initial Data:', data);
-//  console.log('Date Intervals - Recent:', recentStart, recentEnd, 'Comparison:', comparisonStart, comparisonEnd);
 
   // Process each data item
   data.forEach((item) => {
@@ -56,14 +53,25 @@ export const processData = (data, recentStart, recentEnd, comparisonStart, compa
     groupedData[incident_category].entries[dateKey] = (groupedData[incident_category].entries[dateKey] || 0) + parsedCount;
   });
 
-  // Log aggregated entries
-  console.log('Aggregated Entries:', groupedData);
+  // Fill in missing dates with 0s for all categories
+  const fillMissingDates = (categoryData, startDate, endDate) => {
+    const allDates = eachDayOfInterval({ start: startDate, end: endDate });
+    allDates.forEach(date => {
+      const dateKey = formatISO(date, { representation: 'date' });
+      if (!categoryData.entries[dateKey]) {
+        categoryData.entries[dateKey] = 0;
+      }
+    });
+  };
 
-  // Convert aggregated entries back to array format and populate counts
+  // Convert aggregated entries back to array format, populate counts, and fill missing dates
   Object.keys(groupedData).forEach(category => {
     if (category === "metadata") return;
 
     const entriesMap = groupedData[category].entries;
+    fillMissingDates(groupedData[category], comparisonStart, comparisonEnd);
+    fillMissingDates(groupedData[category], recentStart, recentEnd);
+
     groupedData[category].entries = Object.entries(entriesMap).map(([date, count]) => ({
       date: new Date(date),
       count
@@ -78,9 +86,6 @@ export const processData = (data, recentStart, recentEnd, comparisonStart, compa
         groupedData[category].recentCounts.push(count);
       }
     });
-
-    // Log counts for debugging
-    //console.log(`Category: ${category}, Recent Counts:`, groupedData[category].recentCounts, 'Comparison Counts:', groupedData[category].comparisonCounts);
 
     // Calculate averages and standard deviations
     const calculateStats = (counts) => {
@@ -98,14 +103,12 @@ export const processData = (data, recentStart, recentEnd, comparisonStart, compa
       const recentStats = calculateStats(recentCounts);
       groupedData[category].stats.recentAvg = recentStats.average;
       groupedData[category].stats.recentStdDev = recentStats.stdDev;
-      //console.log(`Recent Stats for ${category}:`, recentStats);
     }
 
     if (comparisonCounts.length > 0) {
       const comparisonStats = calculateStats(comparisonCounts);
       groupedData[category].stats.comparisonAvg = comparisonStats.average;
       groupedData[category].stats.comparisonStdDev = comparisonStats.stdDev;
-      //console.log(`Comparison Stats for ${category}:`, comparisonStats);
     }
 
     if (groupedData[category].stats.recentAvg > 0 && groupedData[category].stats.comparisonAvg > 0) {
@@ -113,14 +116,20 @@ export const processData = (data, recentStart, recentEnd, comparisonStart, compa
     }
   });
 
-  //console.log("Processed Data:", groupedData);
+  // Calculate the number of recent days
+  const recentStartDate = new Date(recentStart);
+  const recentEndDate = new Date(recentEnd);
+  const timeDifference = recentEndDate - recentStartDate;
+  const recentDays = Math.ceil(timeDifference / (1000 * 60 * 60 * 24));
+
   return {
     groupedData,
     metadata: {
       recentStart,
       recentEnd,
       comparisonStart,
-      comparisonEnd
+      comparisonEnd,
+      recentDays
     }
   };
 };
@@ -130,8 +139,6 @@ export const calculateStatisticsAndAnomalies = (groupedData) => {
   const statistics = [];
 
   Object.entries(groupedData).forEach(([category, details]) => {
-    console.log("Processing category:", category); // Debug log
-
     if (category === "metadata" || !details.stats) {
       console.warn(`Skipping non-statistical data for category: ${category}`);
       return;
@@ -152,13 +159,13 @@ export const calculateStatisticsAndAnomalies = (groupedData) => {
         yoyChange,
         deviation: Math.abs(recentAvg - comparisonAvg),
         stdDev: comparisonStdDev,
-        entries, // Ensure entries are passed to the anomalies
+        entries,
       });
     }
 
     statistics.push({
       category,
-      entries: entries || [], // Ensure entries is always an array
+      entries: entries || [],
       recentAvg,
       comparisonAvg,
       yoyChange,
