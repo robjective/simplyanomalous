@@ -25,30 +25,37 @@ function AnomalyDisplay({ district, onAnomalyClick }) {
 
 
    // Date Calculation Logic (Move outside useEffect)
-   const calculateDates = () => {
-    const today = new Date();
-    const yesterdayMidnight = new Date(today);
-    yesterdayMidnight.setDate(yesterdayMidnight.getDate() - 1);
-    yesterdayMidnight.setHours(23, 59, 59, 999);
-
-    const calculatedStartDateRecent = new Date(yesterdayMidnight);
-    calculatedStartDateRecent.setDate(calculatedStartDateRecent.getDate() - 14);
-    
-    const calculatedEndDateRecent = new Date(yesterdayMidnight);
-
-    const calculatedEndDateComparison = new Date(calculatedStartDateRecent);
-
-    const calculatedStartDateComparison = new Date(calculatedStartDateRecent);
-    calculatedStartDateComparison.setFullYear(calculatedEndDateComparison.getFullYear() - 1);
-
-
-    return {
-      calculatedStartDateRecent,
-      calculatedEndDateRecent,
-      calculatedStartDateComparison,
-      calculatedEndDateComparison,
-    };
+const calculateDates = () => {
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  
+  // Find the most recent Sunday (start of the last complete week)
+  const lastSunday = new Date(today);
+  lastSunday.setDate(today.getDate() - dayOfWeek - 7);
+  lastSunday.setHours(23, 59, 59, 999);
+  
+  // Find the end of the second-to-last week (Saturday)
+  const endOfSecondToLastWeek = new Date(lastSunday);
+  endOfSecondToLastWeek.setDate(lastSunday.getDate() - 1);
+  
+  // Find the start of the second-to-last week (two weeks ago Sunday)
+  const startOfSecondToLastWeek = new Date(endOfSecondToLastWeek);
+  startOfSecondToLastWeek.setDate(endOfSecondToLastWeek.getDate() - 13);
+  
+  // Define the comparison period (52 weeks before the start of the recent period)
+  const calculatedEndDateComparison = new Date(startOfSecondToLastWeek);
+  calculatedEndDateComparison.setDate(calculatedEndDateComparison.getDate() - 1);
+  const calculatedStartDateComparison = new Date(calculatedEndDateComparison);
+  calculatedStartDateComparison.setDate(calculatedEndDateComparison.getDate() - 364); // 52 weeks = 364 days
+  
+  return {
+    calculatedStartDateRecent: startOfSecondToLastWeek,
+    calculatedEndDateRecent: lastSunday,
+    calculatedStartDateComparison,
+    calculatedEndDateComparison,
   };
+};
+
 
   // If data is not provided, fetch the data using another useEffect
   useEffect(() => {
@@ -131,102 +138,135 @@ function AnomalyDisplay({ district, onAnomalyClick }) {
     }
   }, [data]);
 
-
   const createPlot = (anomaly) => {
     const stat = statistics.find((stat) => stat.category === anomaly.category);
     if (!stat || !stat.entries || stat.entries.length === 0) return null;
-
-    const { entries, longTermAvg, stdDev } = stat;
-    const plotStartDate = new Date(metadata.comparisonStart);
-    const plotEndDate = new Date(metadata.recentEnd);
+  
+    const { entries } = stat;
+  
+    // Define the date ranges
+    const comparisonStartDate = new Date(metadata.comparisonStart);
+    const comparisonEndDate = new Date(metadata.comparisonEnd || metadata.recentStart);
     const recentStartDate = new Date(metadata.recentStart);
     const recentEndDate = new Date(metadata.recentEnd);
-
-    const longTermEntries = entries.filter(
-      (entry) => new Date(entry.date) >= plotStartDate && new Date(entry.date) <= plotEndDate
-    );
-    const recentEntries = entries.filter(
-      (entry) => new Date(entry.date) >= recentStartDate && new Date(entry.date) <= recentEndDate
-    );
-
-    const xValuesLongTerm = longTermEntries.map((entry) => entry.date.toISOString().substring(0, 10));
-    const yValuesLongTerm = longTermEntries.map((entry) => entry.count);
-
-    const xValuesRecent = recentEntries.map((entry) => entry.date.toISOString().substring(0, 10));
-    const yValuesRecent = recentEntries.map((entry) => entry.count);
-
-    const xValues = Array.from(new Set([...xValuesLongTerm, ...xValuesRecent])).sort();
-
-    const yValuesLongTermFilled = xValues.map((date) => {
-      const entry = longTermEntries.find((entry) => entry.date.toISOString().substring(0, 10) === date);
-      return entry ? entry.count : null;
+  
+    // Extract xValues and yValues from entries
+    const xValuesAll = entries.map((entry) => entry.date.toISOString().substring(0, 10));
+    const yValuesAll = entries.map((entry) => entry.count);
+  
+    // Split entries into comparison and recent periods
+    const entriesComparison = entries.filter((entry) => {
+      const entryDate = new Date(entry.date);
+      return entryDate >= comparisonStartDate && entryDate < recentStartDate;
     });
-
-    const yValuesRecentFilled = xValues.map((date) => {
-      const entry = recentEntries.find((entry) => entry.date.toISOString().substring(0, 10) === date);
-      return entry ? entry.count : null;
+  
+    const entriesRecent = entries.filter((entry) => {
+      const entryDate = new Date(entry.date);
+      return entryDate >= recentStartDate && entryDate <= recentEndDate;
     });
-    
+  
+    // Prepare data for comparison period
+    const xValuesComparison = entriesComparison.map((entry) => entry.date.toISOString().substring(0, 10));
+    const yValuesComparison = entriesComparison.map((entry) => entry.count);
+  
+    // Prepare data for recent period
+    const xValuesRecent = entriesRecent.map((entry) => entry.date.toISOString().substring(0, 10));
+    const yValuesRecent = entriesRecent.map((entry) => entry.count);
+  
+    // Create arrays for average lines
+    const comparisonAvgLineX = [xValuesComparison[0], xValuesComparison[xValuesComparison.length - 1]];
+    const comparisonAvgLineY = [anomaly.comparisonAvg, anomaly.comparisonAvg];
+  
+    const recentAvgLineX = [xValuesRecent[0], xValuesRecent[xValuesRecent.length - 1]];
+    const recentAvgLineY = [anomaly.recentAvg, anomaly.recentAvg];
+  
+    // Normal range shading over the entire period
+    const plus2SigmaArray = xValuesAll.map(() => anomaly.comparisonAvg + 2 * anomaly.comparisonStdDev);
+    const minus2SigmaArray = xValuesAll.map(() => anomaly.comparisonAvg - 2 * anomaly.comparisonStdDev);
+  
     return (
       <div className={styles.plotContainer}>
         <Plot
           data={[
+            // Shaded Normal Range Area
             {
               type: "scatter",
-              mode: "lines+markers",
-              x: xValues,
-              y: yValuesLongTermFilled,
-              marker: { size: 4, color: "grey" },
-              name: "Long Term",
-              showlegend: false,
-            },
-            {
-              type: "scatter", 
-              mode: "lines+markers",
-              x: xValues,
-              y: yValuesRecentFilled,
-              marker: { size: 6, color: "gold" },
-              name: `Last ${metadata.recentDays} Days`,
-            },
-            {
-              type: "scatter",
+              x: xValuesAll,
+              y: plus2SigmaArray,
               mode: "lines",
-              x: xValues,
-              y: Array(xValues.length).fill(longTermAvg),
-              line: { color: "darkgrey" },
+              line: { color: "transparent" },
+              showlegend: false,
+              hoverinfo: "skip",
+            },
+            {
+              type: "scatter",
+              x: xValuesAll,
+              y: minus2SigmaArray,
+              mode: "lines",
+              line: { color: "transparent" },
+              fill: "tonexty",
+              fillcolor: "rgba(200,200,200,0.3)",
               name: "Normal Range",
+              showlegend: false,
+              hoverinfo: "skip",
             },
+            // Comparison Period Data
             {
               type: "scatter",
-              mode: "lines",
-              x: xValues,
-              y: Array(xValues.length).fill(longTermAvg + stdDev),
-              line: { color: "darkgrey" },
-              fill: "tonexty",
-              fillcolor: "rgba(255, 0, 0, 0.3)",
+              mode: "lines+markers",
+              x: xValuesComparison,
+              y: yValuesComparison,
+              marker: { size: 4, color: "grey" },
+              line: { color: "grey" },
+              name: "Comparison Period",
               showlegend: false,
             },
+            // Recent Period Data
+            {
+              type: "scatter",
+              mode: "lines+markers",
+              x: xValuesRecent,
+              y: yValuesRecent,
+              marker: { size: 4, color: "gold" },
+              line: { color: "gold" },
+              name: "Recent Period",
+              showlegend: false,
+            },
+            // Comparison Average Line
             {
               type: "scatter",
               mode: "lines",
-              x: xValues,
-              y: Array(xValues.length).fill(longTermAvg - stdDev),
-              line: { color: "darkgrey" },
-              fill: "tonexty",
-              fillcolor: "rgba(0, 128, 0, 0.3)",
+              x: comparisonAvgLineX,
+              y: comparisonAvgLineY,
+              line: { color: "grey", width: 4 },
+              name: "Comparison Average",
+              showlegend: false,
+            },
+            // Recent Average Line
+            {
+              type: "scatter",
+              mode: "lines",
+              x: recentAvgLineX,
+              y: recentAvgLineY,
+              line: { color: "gold", width: 4 },
+              name: "Recent Average",
               showlegend: false,
             },
           ]}
           layout={{
             autosize: true,
             margin: { l: 40, r: 20, t: 20, b: 45 },
-            showlegend: true,
-            legend: { x: 0, y: 1, orientation: "h" },
+            showlegend: false, // Hide the legend
             xaxis: { title: "Week" },
             yaxis: {
               title: "Police Reports Per Week",
               titlefont: { standoff: 10 },
-              range: [0, Math.max(...yValuesLongTerm.concat(yValuesRecent).filter(y => y !== null)) + stdDev],
+              range: [
+                0,
+                Math.max(
+                  ...yValuesAll.concat(plus2SigmaArray).filter((y) => y !== null)
+                ) + (anomaly.comparisonStdDev || 0),
+              ],
             },
           }}
           useResizeHandler={true}
@@ -236,6 +276,10 @@ function AnomalyDisplay({ district, onAnomalyClick }) {
       </div>
     );
   };
+  
+  
+  
+  
 
   return (
     <div className={styles.anomalyContainer}>
@@ -244,9 +288,8 @@ function AnomalyDisplay({ district, onAnomalyClick }) {
           <div
             key={index}
             className={`${styles.anomalyItem} ${
-              anomaly.recentAvg > anomaly.longTermAvg ? styles.positive : styles.negative
+              anomaly.recentAvg > anomaly.comparisonAvg ? styles.positive : styles.negative
             }`}
-            onClick={() => onAnomalyClick(anomaly)}
           >
             <div className={styles.title}>{getHeadline(anomaly, district)}</div>
             {createPlot(anomaly)}
@@ -263,7 +306,7 @@ function AnomalyDisplay({ district, onAnomalyClick }) {
 export default AnomalyDisplay;
 
 function getHeadline(anomaly, district) {
-  const trend = anomaly.recentAvg > anomaly.longTermAvg ? "Up" : "Down";
+  const trend = anomaly.recentAvg > anomaly.comparisonAvg ? "Up" : "Down";
   return `${district ? `SF District ${district}` : "SF"} ${anomaly.category} Police Reports Are ${trend}`;
 }
 
@@ -272,27 +315,28 @@ function getText(anomaly, metadata) {
     console.log("Metadata or anomaly is undefined.");
     return <span>Data is loading or incomplete...</span>;
   }
-
+  console.log(anomaly);
   try {
     const recentPeriodEndFormatted = format(new Date(metadata.recentEnd), 'MMM dd');
     const recentPeriodStartFormatted = format(new Date(metadata.recentStart), 'MMM dd');
-    const { recentAvg, longTermAvg, previousYearAvg, yoyChange } = anomaly;
-    const diff = Math.round((Math.abs(longTermAvg - recentAvg) / longTermAvg) * 100);
-    const trend = recentAvg > longTermAvg ? "more" : "less";
-    const yoyTrend = yoyChange > 0 ? "up" : "down";
+    const { recentAvg, comparisonAvg, comparisonStdDev } = anomaly;
+
+    // Calculate the percentage difference
+    const diff = comparisonAvg
+      ? Math.round(((recentAvg - comparisonAvg) / comparisonAvg) * 100)
+      : 0;
+
+    const trend = recentAvg > comparisonAvg ? "more" : "less";
     const diffColor = trend === "more" ? "red" : "green";
-    const yoyColor = yoyTrend === "up" ? "red" : "green";
-    const yoyDiff = Math.round(Math.abs(yoyChange));
-    const yoyDiffWord = yoyTrend === "up" ? "more" : "fewer";
+
+    // Calculate the normal range
+    const upperBound = Math.round(comparisonAvg + 2 * comparisonStdDev);
+    const lowerBound = Math.round(comparisonAvg - 2 * comparisonStdDev);
     const text = `Between ${recentPeriodStartFormatted} and ${recentPeriodEndFormatted}, ${
       metadata.district ? `SF District ${metadata.district}` : "SF"
-    } saw an average of ${Math.round(recentAvg)} police reports of ${anomaly.category} filed per week, <span style="color:${diffColor}">${diff}%</span> ${trend} than the 1 year average of ${Math.round(
-      longTermAvg
-    )} reports a week. Last year over the same period there were ${Math.round(
-      previousYearAvg
-    )} incidents reported vs this year's total of ${Math.round(
-      recentAvg
-    )}, a difference of <span style="color:${yoyColor}">${yoyDiff} ${yoyDiffWord} incidents</span>.`;
+    } saw an average of ${Math.round(recentAvg)} police reports of ${anomaly.category} filed per week, which is <span style="color:${diffColor}">${diff}%</span> ${trend} than the comparison average of ${Math.round(
+      comparisonAvg
+    )} reports per week. This average falls within the normal range of ${lowerBound} to ${upperBound} reports per week based on the comparison period.`;
 
     return <span dangerouslySetInnerHTML={{ __html: text }} />;
   } catch (error) {

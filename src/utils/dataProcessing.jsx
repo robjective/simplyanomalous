@@ -1,4 +1,6 @@
-import { parseISO, isWithinInterval, eachDayOfInterval, formatISO } from "date-fns";
+// dataProcessing.js
+
+import { parseISO, isWithinInterval, eachWeekOfInterval, startOfWeek, formatISO } from "date-fns";
 import { getCategoryGroup } from "./categoryMappings.js";
 
 export const processData = (data, recentStart, recentEnd, comparisonStart, comparisonEnd) => {
@@ -47,35 +49,51 @@ export const processData = (data, recentStart, recentEnd, comparisonStart, compa
       groupedData[incident_category] = initializeCategoryData();
     }
 
-    // Aggregate counts on the same date
-    const dateKey = parsedDate.toISOString().split('T')[0]; // Get date in YYYY-MM-DD format
-    groupedData[categoryGroup].entries[dateKey] = (groupedData[categoryGroup].entries[dateKey] || 0) + parsedCount;
-    groupedData[incident_category].entries[dateKey] = (groupedData[incident_category].entries[dateKey] || 0) + parsedCount;
+    // Get the start of the week for the date
+    const weekStart = startOfWeek(parsedDate, { weekStartsOn: 1 }); // Assuming week starts on Monday
+    const weekKey = formatISO(weekStart, { representation: 'date' });
+
+    // Aggregate counts per week
+    groupedData[categoryGroup].entries[weekKey] = (groupedData[categoryGroup].entries[weekKey] || 0) + parsedCount;
+    groupedData[incident_category].entries[weekKey] = (groupedData[incident_category].entries[weekKey] || 0) + parsedCount;
   });
 
-  // Fill in missing dates with 0s for all categories
-  const fillMissingDates = (categoryData, startDate, endDate) => {
-    const allDates = eachDayOfInterval({ start: startDate, end: endDate });
-    allDates.forEach(date => {
-      const dateKey = formatISO(date, { representation: 'date' });
-      if (!categoryData.entries[dateKey]) {
-        categoryData.entries[dateKey] = 0;
+  // Determine the overall date range in weeks
+  const overallStartDate = startOfWeek(new Date(Math.min(comparisonStart, recentStart)), { weekStartsOn: 1 });
+  const overallEndDate = startOfWeek(new Date(Math.max(comparisonEnd, recentEnd)), { weekStartsOn: 1 });
+
+  // Adjust the date ranges if necessary to ensure there's no gap between comparison and recent periods
+  if (comparisonEnd < recentStart) {
+    comparisonEnd = startOfWeek(new Date(recentStart), { weekStartsOn: 1 });
+  }
+
+  // Fill in missing weeks with 0s for all categories
+  const fillMissingWeeks = (categoryData, startDate, endDate) => {
+    const allWeeks = eachWeekOfInterval({ start: startDate, end: endDate }, { weekStartsOn: 1 });
+    allWeeks.forEach(date => {
+      const weekKey = formatISO(date, { representation: 'date' });
+      if (!categoryData.entries[weekKey]) {
+        categoryData.entries[weekKey] = 0;
       }
     });
   };
 
-  // Convert aggregated entries back to array format, populate counts, and fill missing dates
+  // Convert aggregated entries back to array format, populate counts, and fill missing weeks
   Object.keys(groupedData).forEach(category => {
     if (category === "metadata") return;
 
     const entriesMap = groupedData[category].entries;
-    fillMissingDates(groupedData[category], comparisonStart, comparisonEnd);
-    fillMissingDates(groupedData[category], recentStart, recentEnd);
 
-    groupedData[category].entries = Object.entries(entriesMap).map(([date, count]) => ({
-      date: new Date(date),
-      count
-    }));
+    // Fill missing weeks for the entire range
+    fillMissingWeeks(groupedData[category], overallStartDate, overallEndDate);
+
+    // Convert entriesMap to entries array and sort by date
+    groupedData[category].entries = Object.entries(entriesMap)
+      .map(([date, count]) => ({
+        date: new Date(date),
+        count
+      }))
+      .sort((a, b) => a.date - b.date); // Sort entries by date
 
     // Populate counts for statistical calculations
     groupedData[category].entries.forEach(({ date, count }) => {
@@ -116,11 +134,8 @@ export const processData = (data, recentStart, recentEnd, comparisonStart, compa
     }
   });
 
-  // Calculate the number of recent days
-  const recentStartDate = new Date(recentStart);
-  const recentEndDate = new Date(recentEnd);
-  const timeDifference = recentEndDate - recentStartDate;
-  const recentDays = Math.ceil(timeDifference / (1000 * 60 * 60 * 24));
+  // Calculate the number of recent weeks
+  const recentWeeks = groupedData[Object.keys(groupedData)[0]]?.recentCounts.length || 0;
 
   return {
     groupedData,
@@ -129,8 +144,10 @@ export const processData = (data, recentStart, recentEnd, comparisonStart, compa
       recentEnd,
       comparisonStart,
       comparisonEnd,
-      recentDays
-    }
+      recentWeeks,
+      overallStartDate,
+      overallEndDate,
+    },
   };
 };
 
@@ -151,14 +168,14 @@ export const calculateStatisticsAndAnomalies = (groupedData) => {
     }
 
     const { recentAvg, comparisonAvg, recentStdDev, comparisonStdDev, yoyChange } = stats;
-    if (Math.abs(recentAvg - comparisonAvg) > comparisonStdDev) {
+    if (Math.abs(recentAvg - comparisonAvg) > (comparisonStdDev / 2)) {
       anomalies.push({
         category,
         recentAvg,
         comparisonAvg,
         yoyChange,
         deviation: Math.abs(recentAvg - comparisonAvg),
-        stdDev: comparisonStdDev,
+        comparisonStdDev,
         entries,
       });
     }

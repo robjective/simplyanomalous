@@ -6,23 +6,19 @@ import {
   useParams,
   useLocation,
 } from "react-router-dom";
-import TopNav from "./TopNav";
-
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import ToggleButton from '@mui/material/ToggleButton';
 import TabContent from "./TabContent";
-import "./App.css";
 import AnomalyDisplay from "./AnomalyDisplay";
+import "./App.css";
 
 function SupervisorRoute({ supervisors, setSelectedSupervisors }) {
   const { supervisorName, districtId } = useParams();
-  const location = useLocation();
 
   const supervisor = supervisors.find(
     (sup) =>
       sup.sup_name.replace(/\s+/g, "-").toLowerCase() === supervisorName
   );
-
 
   return (
     <TabContent
@@ -59,20 +55,22 @@ function App() {
 
   return (
     <Router>
-      <div className="App" style={{ padding: "20px" }}>
+      <div className="App p-5">
         <header>
           <div className="header-container">
             <h1>Transparent San Francisco</h1>
             <span className="badge">Beta</span>
           </div>
         </header>
-         {/* Supervisor Toggle Button Group - Below Subheader */}
-         <div className="supervisor-toggle" style={{ margin: "20px 0" }}>
+
+        {/* Supervisor Toggle Button Group - Scrollable on Mobile */}
+        <div className="supervisor-toggle overflow-x-auto py-5">
           <ToggleButtonGroup
             value={selectedSupervisor}
             exclusive
             onChange={handleSupervisorChange}
             aria-label="supervisor selection"
+            className="flex flex-nowrap" // Tailwind classes for flex container
           >
             {/* Add the Citywide button */}
             <ToggleButton
@@ -80,10 +78,11 @@ function App() {
               value="citywide"
               aria-label="Citywide London Breed"
               href="/"
+              className="min-w-[100px] flex-shrink-0" // Tailwind for min width and no shrinking
             >
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.8em' }}>Citywide</span>
-                <span style={{ fontSize: '1em' }}>London Breed</span>
+              <div className="flex flex-col items-center">
+                <span className="text-sm">Citywide</span>
+                <span className="text-base">London Breed</span>
               </div>
             </ToggleButton>
             {/* Display sorted supervisors */}
@@ -103,19 +102,20 @@ function App() {
                   href={supervisor.sup_dist_num === "citywide" || supervisor.sup_dist_num === "mayor"
                     ? "/"
                     : `/${supervisor.sup_name.replace(/\s+/g, "-").toLowerCase()}/district/${supervisor.sup_dist_num}`}
+                  className="min-w-[100px] flex-shrink-0" // Tailwind for min width and no shrinking
                 >
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div className="flex flex-col items-center">
                     {/* Conditionally render District X or other labels */}
                     {supervisor.sup_dist_num !== "citywide" && supervisor.sup_dist_num !== "mayor" ? (
-                      <span style={{ fontSize: '0.8em' }}>
+                      <span className="text-sm">
                         {`District ${parseInt(supervisor.sup_dist_num)}`}
                       </span>
                     ) : (
-                      <span style={{ fontSize: '0.8em' }}>
+                      <span className="text-sm">
                         {supervisor.sup_name}
                       </span>
                     )}
-                    <span style={{ fontSize: '1em', textAlign: 'center' }}>
+                    <span className="text-base text-center">
                       {supervisor.sup_name}
                     </span>
                   </div>
@@ -123,10 +123,12 @@ function App() {
               ))}
           </ToggleButtonGroup>
         </div>
+
         {/* Date Selector Placeholder */}
         <div className="date-selector">
           {/* Your date selector component here */}
         </div>
+
         <Routes>
           {/* Home Route */}
           <Route
@@ -154,9 +156,7 @@ function App() {
           <Route
             path="/Trends"
             element={
-              <AnomalyDisplay
-                
-              />
+              <AnomalyDisplay />
             }
           />
           {/* Dynamic Supervisor Routes */}
@@ -188,10 +188,7 @@ function App() {
             }
           />
         </Routes>
-        <TopNav
-          supervisors={supervisors}
-          setSelectedDistrict={setSelectedDistrict}
-        />
+
         {/* Footer Links */}
         <footer>
           <nav>
