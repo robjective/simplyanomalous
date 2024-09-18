@@ -4,10 +4,9 @@ import {
   Routes,
   Route,
   useParams,
-  useLocation,
 } from "react-router-dom";
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import ToggleButton from '@mui/material/ToggleButton';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
 import TabContent from "./TabContent";
 import AnomalyDisplay from "./AnomalyDisplay";
 import "./App.css";
@@ -40,7 +39,7 @@ function App() {
       setSupervisors([
         { sup_name: "Citywide", sup_dist_num: "citywide" },
         { sup_name: "London Breed", sup_dist_num: "mayor" },
-        ...data
+        ...data,
       ]);
     };
 
@@ -60,68 +59,76 @@ function App() {
           <div className="header-container">
             <h1>Transparent San Francisco</h1>
             <span className="badge">Beta</span>
+            <p>
+              This site is built on San Francisco's{" "}
+              <a href="https://datasf.org/opendata/">Open Data Project</a>. We
+              cut through the noise to reveal trends and insights. We're making
+              San Francisco more accountable, one dataset at a time.
+            </p>
           </div>
         </header>
 
-        {/* Supervisor Toggle Button Group - Scrollable on Mobile */}
-        <div className="supervisor-toggle overflow-x-auto py-5">
-          <ToggleButtonGroup
+        {/* Supervisor Tabs - Scrollable on Mobile */}
+        <div className="supervisor-tabs overflow-x-auto py-5">
+          <Tabs
             value={selectedSupervisor}
-            exclusive
             onChange={handleSupervisorChange}
+            variant="scrollable"
+            scrollButtons="auto"
             aria-label="supervisor selection"
-            className="flex flex-nowrap" // Tailwind classes for flex container
           >
-            {/* Add the Citywide button */}
-            <ToggleButton
+            {/* Add the Citywide tab */}
+            <Tab
               key="citywide"
+              label={
+                <div className="flex flex-col items-center">
+                  <span className="text-sm">Citywide</span>
+                  <span className="text-base">London Breed</span>
+                </div>
+              }
               value="citywide"
-              aria-label="Citywide London Breed"
               href="/"
-              className="min-w-[100px] flex-shrink-0" // Tailwind for min width and no shrinking
-            >
-              <div className="flex flex-col items-center">
-                <span className="text-sm">Citywide</span>
-                <span className="text-base">London Breed</span>
-              </div>
-            </ToggleButton>
+            />
             {/* Display sorted supervisors */}
             {supervisors
               .sort((a, b) => {
-                if (a.sup_dist_num === "citywide" || a.sup_dist_num === "mayor") return -1; // Keep Citywide and London Breed buttons at the top
-                if (b.sup_dist_num === "citywide" || b.sup_dist_num === "mayor") return 1;
+                if (a.sup_dist_num === "citywide" || a.sup_dist_num === "mayor")
+                  return -1; // Keep Citywide and London Breed tabs at the top
+                if (b.sup_dist_num === "citywide" || b.sup_dist_num === "mayor")
+                  return 1;
                 return parseInt(a.sup_dist_num) - parseInt(b.sup_dist_num);
               })
               .map((supervisor) => (
-                <ToggleButton
+                <Tab
                   key={supervisor.sup_dist_num}
-                  value={supervisor.sup_dist_num}
-                  aria-label={supervisor.sup_dist_num === "citywide" || supervisor.sup_dist_num === "mayor"
-                    ? supervisor.sup_name
-                    : `District ${parseInt(supervisor.sup_dist_num)} ${supervisor.sup_name}`}
-                  href={supervisor.sup_dist_num === "citywide" || supervisor.sup_dist_num === "mayor"
-                    ? "/"
-                    : `/${supervisor.sup_name.replace(/\s+/g, "-").toLowerCase()}/district/${supervisor.sup_dist_num}`}
-                  className="min-w-[100px] flex-shrink-0" // Tailwind for min width and no shrinking
-                >
-                  <div className="flex flex-col items-center">
-                    {/* Conditionally render District X or other labels */}
-                    {supervisor.sup_dist_num !== "citywide" && supervisor.sup_dist_num !== "mayor" ? (
-                      <span className="text-sm">
-                        {`District ${parseInt(supervisor.sup_dist_num)}`}
-                      </span>
-                    ) : (
-                      <span className="text-sm">
+                  label={
+                    <div className="flex flex-col items-center">
+                      {/* Conditionally render District X or other labels */}
+                      {supervisor.sup_dist_num !== "citywide" &&
+                      supervisor.sup_dist_num !== "mayor" ? (
+                        <span className="text-sm">
+                          {`District ${parseInt(supervisor.sup_dist_num)} `}
+                        </span>
+                      ) : (
+                        <span className="text-sm">{supervisor.sup_name}</span>
+                      )}
+                      <span className="text-base text-center">
                         {supervisor.sup_name}
                       </span>
-                    )}
-                    <span className="text-base text-center">
-                      {supervisor.sup_name}
-                    </span>
-                  </div>
-                </ToggleButton>
+                    </div>
+                  }
+                  value={supervisor.sup_dist_num}
+                  href={
+                    supervisor.sup_dist_num === "citywide" ||
+                    supervisor.sup_dist_num === "mayor"
+                      ? "/"
+                      : `/${supervisor.sup_name
+                          .replace(/\s+/g, "-")
+                          .toLowerCase()}/district/${supervisor.sup_dist_num}`
+                  }
+                />
               ))}
-          </ToggleButtonGroup>
+          </Tabs>
         </div>
 
         {/* Date Selector Placeholder */}
@@ -153,12 +160,7 @@ function App() {
             }
           />
           {/* Trends Route */}
-          <Route
-            path="/Trends"
-            element={
-              <AnomalyDisplay />
-            }
-          />
+          <Route path="/Trends" element={<AnomalyDisplay />} />
           {/* Dynamic Supervisor Routes */}
           <Route
             path="/:supervisorName/district/:districtId"
