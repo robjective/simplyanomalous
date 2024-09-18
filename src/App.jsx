@@ -4,6 +4,7 @@ import {
   Routes,
   Route,
   useParams,
+  useLocation,
 } from "react-router-dom";
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
@@ -30,7 +31,7 @@ function SupervisorRoute({ supervisors, setSelectedSupervisors }) {
 function App() {
   const [selectedDistrict, setSelectedDistrict] = useState(null);
   const [supervisors, setSupervisors] = useState([]);
-  const [selectedSupervisor, setSelectedSupervisor] = useState("");
+  const [selectedSupervisor, setSelectedSupervisor] = useState("citywide"); // Set default value to "citywide"
 
   // Fetch supervisors from an API
   useEffect(() => {
@@ -46,6 +47,7 @@ function App() {
     fetchSupervisors();
   }, []);
 
+  // Define the handleSupervisorChange function
   const handleSupervisorChange = (event, newSupervisor) => {
     if (newSupervisor !== null) {
       setSelectedSupervisor(newSupervisor);
@@ -71,7 +73,7 @@ function App() {
         {/* Supervisor Tabs - Scrollable on Mobile */}
         <div className="supervisor-tabs overflow-x-auto py-5">
           <Tabs
-            value={selectedSupervisor}
+            value={supervisors.some((sup) => sup.sup_dist_num === selectedSupervisor) ? selectedSupervisor : "citywide"} // Ensure valid value
             onChange={handleSupervisorChange}
             variant="scrollable"
             scrollButtons="auto"
@@ -82,7 +84,7 @@ function App() {
               key="citywide"
               label={
                 <div className="flex flex-col items-center">
-                  <span className="text-sm">Citywide</span>
+                  <span className="text-sm">Citywide&nbsp;</span>
                   <span className="text-base">London Breed</span>
                 </div>
               }
@@ -130,6 +132,9 @@ function App() {
               ))}
           </Tabs>
         </div>
+
+        {/* useLocation must be inside Router context */}
+        <LocationSync setSelectedSupervisor={setSelectedSupervisor} supervisors={supervisors} />
 
         {/* Date Selector Placeholder */}
         <div className="date-selector">
@@ -200,6 +205,29 @@ function App() {
       </div>
     </Router>
   );
+}
+
+// Component to handle location change
+function LocationSync({ setSelectedSupervisor, supervisors }) {
+  const location = useLocation();
+
+  useEffect(() => {
+    const pathParts = location.pathname.split("/");
+    if (pathParts.length > 1) {
+      const supervisorPart = pathParts[1];
+      const selectedSupervisor = supervisors.find(
+        (sup) =>
+          sup.sup_name.replace(/\s+/g, "-").toLowerCase() === supervisorPart
+      );
+      if (selectedSupervisor) {
+        setSelectedSupervisor(selectedSupervisor.sup_dist_num);
+      } else if (location.pathname === "/") {
+        setSelectedSupervisor("citywide");
+      }
+    }
+  }, [location.pathname, supervisors, setSelectedSupervisor]);
+
+  return null; // No UI needed
 }
 
 export default App;
