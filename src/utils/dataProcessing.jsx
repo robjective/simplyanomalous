@@ -62,11 +62,7 @@ export const processData = (data, recentStart, recentEnd, comparisonStart, compa
   const overallStartDate = startOfWeek(new Date(Math.min(comparisonStart, recentStart)), { weekStartsOn: 1 });
   const overallEndDate = startOfWeek(new Date(Math.max(comparisonEnd, recentEnd)), { weekStartsOn: 1 });
 
-  // Adjust the date ranges if necessary to ensure there's no gap between comparison and recent periods
-  if (comparisonEnd < recentStart) {
-    comparisonEnd = startOfWeek(new Date(recentStart), { weekStartsOn: 1 });
-  }
-
+  
   // Fill in missing weeks with 0s for all categories
   const fillMissingWeeks = (categoryData, startDate, endDate) => {
     const allWeeks = eachWeekOfInterval({ start: startDate, end: endDate }, { weekStartsOn: 1 });

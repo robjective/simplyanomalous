@@ -1,3 +1,5 @@
+// TabContent.jsx
+
 import React, { useState, useEffect } from 'react';
 import ErrorBarCharts from './ErrorBarCharts';
 import AnomalyDisplay from './AnomalyDisplay';
@@ -28,7 +30,7 @@ function TabContent({
   const [isLoading, setIsLoading] = useState(false); // Single loading state
   const [metadata, setMetadata] = useState({});
   const [incidentData, setIncidentData] = useState([]);
-  const [dateRange, setDateRange] = useState('lastTwoWeeks');
+  const [dateRange, setDateRange] = useState('yearToDate');
   const [startDateRecent, setStartDateRecent] = useState(new Date());
   const [endDateRecent, setEndDateRecent] = useState(new Date());
   const [startDateComparison, setStartDateComparison] = useState(new Date());
@@ -46,14 +48,11 @@ function TabContent({
       setIsLoading(true); // Set loading state to true at the start
       try {
         await fetchDistrictData(district);
+      } catch (error) {
+        console.error('Error in fetchData:', error);
       } finally {
-         // Check if isLoading is already false before setting it to false again
-         if (!isLoading) {
-          console.warn('isLoading is already false, but attempting to set to false again.');
-        } else {
-          console.log('Data fetch complete, setting isLoading to false');
-          setIsLoading(false); // Set loading state to false after fetching is done
-        }
+        console.log('Data fetch complete, setting isLoading to false');
+        setIsLoading(false); // Set loading state to false after fetching is done
       }
     };
     fetchData();
@@ -71,7 +70,8 @@ function TabContent({
     const yesterdayMidnight = new Date(today);
     yesterdayMidnight.setDate(yesterdayMidnight.getDate() - 1);
     yesterdayMidnight.setHours(23, 59, 59, 999);
-
+    console.log("Running setInitialDates with dateRange:", dateRange);
+    
     let startDateRecent,
       endDateRecent,
       startDateComparison,
@@ -86,43 +86,56 @@ function TabContent({
         recentSaturday.setDate(
           recentSaturday.getDate() - ((recentSaturday.getDay() + 1) % 7)
         );
-
+        console.log('Recent Saturday:', recentSaturday);
         // Set start and end dates for the recent period
         startDateRecent = new Date(recentSaturday);
-        startDateRecent.setDate(startDateRecent.getDate() - 13);
-
+        startDateRecent.setDate(recentSaturday.getDate() - 14);
+        console.log('Recent Start Date:', startDateRecent);
         endDateRecent = new Date(recentSaturday);
+        console.log('Recent End Date:', endDateRecent);
 
         // Set start and end dates for the comparison period (same weeks last year)
         startDateComparison = new Date(startDateRecent);
         startDateComparison.setFullYear(startDateComparison.getFullYear() - 1);
+        console.log('Comparison Start Date:', startDateComparison);
 
         endDateComparison = new Date(endDateRecent);
         endDateComparison.setFullYear(endDateComparison.getFullYear() - 1);
+        console.log('Comparison End Date:', endDateComparison);
         break;
 
       case 'lastMonth':
         endDateRecent = new Date(yesterdayMidnight);
         startDateRecent = new Date(endDateRecent);
         startDateRecent.setDate(startDateRecent.getDate() - 28);
+        console.log('Recent Start Date (Last Month):', startDateRecent);
+        console.log('Recent End Date (Last Month):', endDateRecent);
 
         endDateComparison = new Date(endDateRecent);
         endDateComparison.setFullYear(endDateComparison.getFullYear() - 1);
+        console.log('Comparison End Date (Last Month):', endDateComparison);
 
         startDateComparison = new Date(startDateRecent);
         startDateComparison.setFullYear(startDateComparison.getFullYear() - 1);
+        console.log('Comparison Start Date (Last Month):', startDateComparison);
         break;
 
       case 'yearToDate':
         endDateRecent = new Date(yesterdayMidnight);
         startDateRecent = new Date(endDateRecent.getFullYear(), 0, 1);
+        console.log('Recent Start Date (Year To Date):', startDateRecent);
+        console.log('Recent End Date (Year To Date):', endDateRecent);
 
         endDateComparison = new Date(endDateRecent);
         endDateComparison.setFullYear(endDateComparison.getFullYear() - 1);
+        console.log('Comparison End Date (Year To Date):', endDateComparison);
+
         startDateComparison = new Date(endDateComparison.getFullYear(), 0, 1);
+        console.log('Comparison Start Date (Year To Date):', startDateComparison);
         break;
 
       default:
+        console.warn('Unknown dateRange:', dateRange);
         break;
     }
 
@@ -130,6 +143,8 @@ function TabContent({
     setEndDateRecent(endDateRecent);
     setStartDateComparison(startDateComparison);
     setEndDateComparison(endDateComparison);
+    console.log('Updated Dates - Start Recent:', startDateRecent, 'End Recent:', endDateRecent);
+    console.log('Updated Dates - Start Comparison:', startDateComparison, 'End Comparison:', endDateComparison);
   };
 
   const fetchDistrictData = async (district) => {
@@ -163,6 +178,7 @@ function TabContent({
 
       // Process and set incident data
       console.log('Processing incident data');
+      
       const { groupedData, metadata } = processData(
         incidentData,
         startDateRecent,
@@ -172,7 +188,6 @@ function TabContent({
       );
       setAllData(groupedData || []);
       setMetadata(metadata || {});
-
       // Set crime dashboard data
       console.log('Setting crime dashboard data');
       setCrimeDashData(crimeDashData || []);
@@ -195,25 +210,29 @@ function TabContent({
       setDistrictData(districtGeoJsonData);
     } catch (error) {
       console.error('Error fetching district data:', error);
+      // Optionally, set an error state to display to the user
     }
   };
 
   const handleDateRangeChange = (event, newRange) => {
     if (newRange !== null) {
+      console.log('Date Range Changed to:', newRange);
       setDateRange(newRange);
+    } else {
+      console.log('Date Range Change Cancelled or Invalid:', newRange);
     }
   };
 
   return (
     <Box>
       <Box>
-        <Typography variant="h4" gutterBottom>
+        <Typography variant="h6" gutterBottom>
             {district ? `District ${Math.floor(district)}` : 'Citywide'} Crime Dashboard
         </Typography>
         
         <Box display="flex" alignItems="center" mb={2}>
           {district ? (
-            <Typography variant="h6" gutterBottom>
+            <Typography variant="h4" gutterBottom>
               {`Supervisor: ${
                 districtData?.features.find(
                   (feature) => feature.properties.district === district

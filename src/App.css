@@ -5,10 +5,54 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Remove the default MUI Tabs indicator */
+.MuiTabs-indicator {
+  display: none;
+}
+
+/* Optional: Adjust the Tabs container to align pills properly */
+.supervisor-tabs .MuiTabs-flexContainer {
+  gap: 2px; /* Space between pills */
+}
+
+/* Unvisited Links */
+a:link {
+  color: #333333; /* Very dark grey */
+  font-weight: 500; /* Slightly bold */
+  text-decoration: none; /* Removes underline */
+  transition: font-weight 0.2s, color 0.2s; /* Smooth transition for interactions */
+}
+/* Add padding to the Learn More section */
+.learn-more-section {
+  padding: 20px;
+}
+
+/* Visited Links */
+a:visited {
+  color: #333333; /* Maintains very dark grey */
+  font-weight: 400; /* Less bold */
+  text-decoration: none; /* Removes underline */
+  transition: font-weight 0.2s, color 0.2s; /* Smooth transition for interactions */
+}
+
+/* Hover State for Unvisited and Visited Links */
+a:hover {
+  color: #555555; /* Slightly lighter grey on hover */
+  text-decoration: underline; /* Underline on hover for better accessibility */
+  font-weight: 600; /* Slightly bolder on hover */
+}
+
+/* Active State for Unvisited and Visited Links */
+a:active {
+  color: #111111; /* Darker grey when active/clicked */
+  font-weight: 600; /* Slightly bolder when active */
+}
+
 /* Apply Open Sans font to the entire body */
 body {
     font-family: 'Open Sans', sans-serif; /* Use Open Sans with fallback to sans-serif */
-}
+    color: #999;
+    }
 
 /* Styling for h1 to make it smaller */
 header h1 {
@@ -94,4 +138,22 @@ nav a.active {
 .supervisor-nav a.active {
   background-color: #007bff;
   color: white;
+}
+.scroll-to-top {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 10px;
+  background-color: #78a2eb;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  z-index: 1000;
+  transition: background-color 0.3s;
+}
+
+.scroll-to-top:hover {
+  background-color: #78a2eb;
 }
