@@ -30,7 +30,7 @@ function TabContent({
   const [isLoading, setIsLoading] = useState(false); // Single loading state
   const [metadata, setMetadata] = useState({});
   const [incidentData, setIncidentData] = useState([]);
-  const [dateRange, setDateRange] = useState('yearToDate');
+  const [dateRange, setDateRange] = useState('lastTwoWeeks');
   const [startDateRecent, setStartDateRecent] = useState(new Date());
   const [endDateRecent, setEndDateRecent] = useState(new Date());
   const [startDateComparison, setStartDateComparison] = useState(new Date());
