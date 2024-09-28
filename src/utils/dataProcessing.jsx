@@ -1,5 +1,3 @@
-// dataProcessing.js
-
 import { parseISO, isWithinInterval, eachWeekOfInterval, startOfWeek, formatISO } from "date-fns";
 import { getCategoryGroup } from "./categoryMappings.js";
 
@@ -22,7 +20,7 @@ export const processData = (data, recentStart, recentEnd, comparisonStart, compa
 
   // Process each data item
   data.forEach((item) => {
-    const { incident_category, date, count } = item;
+    const { incident_description, date, count } = item;
 
     if (!date || !count) {
       console.error(`Missing data point skipped: Date: ${date}, Count: ${count}`);
@@ -41,12 +39,12 @@ export const processData = (data, recentStart, recentEnd, comparisonStart, compa
       return;
     }
 
-    const categoryGroup = getCategoryGroup(incident_category);
+    const categoryGroup = getCategoryGroup(incident_description);
     if (!groupedData[categoryGroup]) {
       groupedData[categoryGroup] = initializeCategoryData();
     }
-    if (!groupedData[incident_category]) {
-      groupedData[incident_category] = initializeCategoryData();
+    if (!groupedData[incident_description]) {
+      groupedData[incident_description] = initializeCategoryData();
     }
 
     // Get the start of the week for the date
@@ -55,7 +53,7 @@ export const processData = (data, recentStart, recentEnd, comparisonStart, compa
 
     // Aggregate counts per week
     groupedData[categoryGroup].entries[weekKey] = (groupedData[categoryGroup].entries[weekKey] || 0) + parsedCount;
-    groupedData[incident_category].entries[weekKey] = (groupedData[incident_category].entries[weekKey] || 0) + parsedCount;
+    groupedData[incident_description].entries[weekKey] = (groupedData[incident_description].entries[weekKey] || 0) + parsedCount;
   });
 
   // Determine the overall date range in weeks
@@ -92,6 +90,9 @@ export const processData = (data, recentStart, recentEnd, comparisonStart, compa
       .sort((a, b) => a.date - b.date); // Sort entries by date
 
     // Populate counts for statistical calculations
+    console.log(category, recentStart, recentEnd);
+    
+
     groupedData[category].entries.forEach(({ date, count }) => {
       if (isWithinInterval(date, { start: comparisonStart, end: comparisonEnd })) {
         groupedData[category].comparisonCounts.push(count);
@@ -164,18 +165,26 @@ export const calculateStatisticsAndAnomalies = (groupedData) => {
     }
 
     const { recentAvg, comparisonAvg, recentStdDev, comparisonStdDev, yoyChange } = stats;
-    if (Math.abs(recentAvg - comparisonAvg) > (comparisonStdDev / 2)) {
-      anomalies.push({
-        category,
-        recentAvg,
-        comparisonAvg,
-        yoyChange,
-        deviation: Math.abs(recentAvg - comparisonAvg),
-        comparisonStdDev,
-        entries,
-      });
-    }
 
+    // Calculate if the category is out of bounds (deviation > 1/2 sigma)
+    const outOfBounds = 
+    Math.abs(recentAvg - comparisonAvg) > (comparisonStdDev * 1.5) &&
+    recentAvg >= 1 &&
+    comparisonAvg >= 1;
+
+    // Store anomalies 
+    anomalies.push({
+      category,
+      recentAvg,
+      comparisonAvg,
+      yoyChange,
+      deviation: Math.abs(recentAvg - comparisonAvg),
+      comparisonStdDev,
+      entries,
+      outOfBounds, // Add the outOfBounds field
+    });
+
+    // Store statistics for each category
     statistics.push({
       category,
       entries: entries || [],
@@ -184,8 +193,10 @@ export const calculateStatisticsAndAnomalies = (groupedData) => {
       yoyChange,
       recentStdDev,
       comparisonStdDev,
+      outOfBounds, // Include in the statistics array too
     });
   });
 
   return { anomalies, statistics };
 };
+

@@ -1,5 +1,5 @@
 // utils/api.js
-export const fetchDataFromAPI = async (queryObject, updateLoadingCount) => {
+export const fetchDataFromAPI = async (queryObject, updateLoadingCount, updateProgress) => {
   const baseUrl = "https://data.sfgov.org/resource/";
   let allData = [];
   let limit = 1000; // Set the limit for each request
@@ -27,6 +27,9 @@ export const fetchDataFromAPI = async (queryObject, updateLoadingCount) => {
       }
       const data = await response.json();
       allData = allData.concat(data);
+
+      // Call updateProgress with the current total rows
+      if (updateProgress) updateProgress(allData.length);
 
       if (data.length < limit) {
         hasMoreData = false; // Stop if the data received is less than the limit

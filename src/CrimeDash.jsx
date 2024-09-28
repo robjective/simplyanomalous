@@ -299,7 +299,7 @@ function CrimeDash({ data, metadata, districtData }) {
                   ref={mapRef}
                   style={{ height: "300px", width: "100%" }}
                   center={[37.7749, -122.4194]}
-                  zoom={12}
+                  zoom={11}
                   scrollWheelZoom={false} // Disable scroll wheel zoom
                   touchZoom={false}       // Disable touch zooming
                   dragging={false}        // Disable map dragging

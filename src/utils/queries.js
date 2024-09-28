@@ -58,55 +58,96 @@ export const getSupervisorQuery = () => ({
     query: `SELECT sup_dist_num, sup_name, multipolygon WHERE sup_dist_num IS NOT NULL`
   });
   
-  export const getIncidentQuery = (startDateRecent, endDateRecent, startDateComparison, endDateComparison, district) => {
-    let whereClauseRecent = `report_datetime >= '${startDateRecent.toISOString().replace('Z', '')}' AND report_datetime <= '${endDateRecent.toISOString().replace('Z', '')}'`;
-    let whereClauseComparison = `report_datetime >= '${startDateComparison.toISOString().replace('Z', '')}' AND report_datetime <= '${endDateComparison.toISOString().replace('Z', '')}'`;
-  
-    if (district) {
-      whereClauseRecent += ` AND supervisor_district = '${district}'`;
-      whereClauseComparison += ` AND supervisor_district = '${district}'`;
-    }
-  
-    return {
-      endpoint: "wg3w-h783.json",
-      query: `
-        SELECT incident_category, supervisor_district, date_trunc_ymd(report_datetime) AS date, COUNT(*) AS count 
-        WHERE (${whereClauseRecent}) OR (${whereClauseComparison})
-        GROUP BY incident_category, supervisor_district, date 
-        ORDER BY date`
-    };
-  };
-  
-  export const getAnomalyQuery = (fromDate, toDate, category) => {
-    const whereClause = `report_datetime >= '${fromDate}' AND report_datetime <= '${toDate}' AND incident_category = '${category}'`;
-  
-    return {
-      endpoint: "wg3w-h783.json",
-      query: `
-        SELECT Intersection, COUNT(*) as count
-        WHERE ${whereClause}
-        GROUP BY Intersection
-        ORDER BY count DESC`
-    };
-  };
-  
-  export const getEmployeeSalaryQuery = (employeeName) => ({
-    endpoint: "employee_compensation.json", // Adjust the endpoint if necessary
+export const getIncidentQuery = (startDateRecent, endDateRecent, startDateComparison, endDateComparison, district) => {
+  let whereClauseRecent = `report_datetime >= '${startDateRecent.toISOString().replace('Z', '')}' AND report_datetime <= '${endDateRecent.toISOString().replace('Z', '')}'`;
+  let whereClauseComparison = `report_datetime >= '${startDateComparison.toISOString().replace('Z', '')}' AND report_datetime <= '${endDateComparison.toISOString().replace('Z', '')}'`;
+
+  if (district) {
+    whereClauseRecent += ` AND supervisor_district = '${district}'`;
+    whereClauseComparison += ` AND supervisor_district = '${district}'`;
+  }
+
+  return {
+    endpoint: "wg3w-h783.json",
     query: `
-        SELECT 
-            employee_identifier,
-            job,
-            organization_group,
-            department,
-            union,
-            salary,
-            other_salaries,
-            total_salary,
-            benefits,
-            total_compensation,
-            year
-        WHERE 
-            employee_identifier = '${employeeName}' AND 
-            year_type = 'Calendar'
-        ORDER BY year ASC`
+      SELECT incident_category, supervisor_district, date_trunc_ymd(report_datetime) AS date, COUNT(*) AS count 
+      WHERE (${whereClauseRecent}) OR (${whereClauseComparison})
+      GROUP BY incident_category, supervisor_district, date 
+      ORDER BY date`
+  };
+};
+
+
+export const getAnomalyQuery = (
+  startDateRecent,
+  endDateRecent,
+  startDateComparison,
+  endDateComparison,
+  district
+) => {
+  const startDateRecentStr = startDateRecent.toISOString().replace('Z', '');
+  const endDateRecentStr = endDateRecent.toISOString().replace('Z', '');
+  const startDateComparisonStr = startDateComparison.toISOString().replace('Z', '');
+  const endDateComparisonStr = endDateComparison.toISOString().replace('Z', '');
+
+  let whereClauseRecent = `report_datetime >= '${startDateRecentStr}' AND report_datetime <= '${endDateRecentStr}'`;
+  let whereClauseComparison = `report_datetime >= '${startDateComparisonStr}' AND report_datetime <= '${endDateComparisonStr}'`;
+
+  if (district) {
+    whereClauseRecent += ` AND supervisor_district = '${district}'`;
+    whereClauseComparison += ` AND supervisor_district = '${district}'`;
+  }
+
+  return {
+    endpoint: 'wg3w-h783.json',
+    query: `
+      SELECT 
+        incident_description,
+        date_trunc_ymd(report_datetime) AS date,
+        COUNT(distinct incident_number) AS count,
+        CASE 
+          WHEN report_datetime >= '${startDateRecentStr}' AND report_datetime <= '${endDateRecentStr}' THEN 'recent'
+          ELSE 'comparison'
+        END AS period
+      WHERE (${whereClauseRecent}) OR (${whereClauseComparison}) 
+      GROUP BY incident_description, date, period
+      ORDER BY incident_description, date
+    `,
+  };
+};
+
+
+
+export const getHomicideyQuery = (fromDate, toDate, category) => {
+  const whereClause = `report_datetime >= '${fromDate}' AND report_datetime <= '${toDate}' AND incident_category = 'Homicide'`;
+
+  return {
+    endpoint: "wg3w-h783.json",
+    query: `
+      SELECT distinct Incident_id as count
+      WHERE ${whereClause}
+
+      ORDER BY count DESC`
+  };
+};
+
+export const getEmployeeSalaryQuery = (employeeName) => ({
+  endpoint: "employee_compensation.json", // Adjust the endpoint if necessary
+  query: `
+      SELECT 
+          employee_identifier,
+          job,
+          organization_group,
+          department,
+          union,
+          salary,
+          other_salaries,
+          total_salary,
+          benefits,
+          total_compensation,
+          year
+      WHERE 
+          employee_identifier = '${employeeName}' AND 
+          year_type = 'Calendar'
+      ORDER BY year ASC`
 });

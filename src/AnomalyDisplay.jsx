@@ -5,15 +5,10 @@ import styles from "./AnomalyDisplay.module.css";
 import { format } from "date-fns";
 import { fetchDataFromAPI } from './utils/api';
 import { processData } from './utils/dataProcessing';
+import { getAnomalyQuery } from './utils/queries';
+import { startOfWeek, subWeeks, subDays } from 'date-fns';
 
-
-import {
-  getSupervisorQuery,
-  getIncidentQuery,
-  getCategoryComparisonQuery,
-} from './utils/queries';
-
-function AnomalyDisplay({ district, onAnomalyClick }) {
+function AnomalyDisplay({ district }) {
   const [anomalies, setAnomalies] = useState([]);
   const [statistics, setStatistics] = useState([]);
   const [startDateRecent, setStartDateRecent] = useState(new Date());
@@ -22,51 +17,49 @@ function AnomalyDisplay({ district, onAnomalyClick }) {
   const [endDateComparison, setEndDateComparison] = useState(new Date());
   const [data, setAllData] = useState([]);
   const [metadata, setMetadata] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [rowsLoaded, setRowsLoaded] = useState(0);
 
+  const [outOfBoundsAnomalies, setOutOfBoundsAnomalies] = useState([]);
+  const [inBoundsCategories, setInBoundsCategories] = useState([]);
 
-   // Date Calculation Logic (Move outside useEffect)
-const calculateDates = () => {
-  const today = new Date();
-  const dayOfWeek = today.getDay();
+  const [isInBoundsExpanded, setIsInBoundsExpanded] = useState(false); // State for toggling the in-bounds categories list
+
+  // Date Calculation Logic
+  const calculateDates = () => {
+    const today = new Date();
+    
+    // Get the most recent Sunday
+    const endOfRecentPeriod = startOfWeek(today, { weekStartsOn: 0 }); // Start of the current week where Sunday is the start (0)
+    
+    // Define the recent period as the two weeks ending the most recent Sunday
+    const calculatedEndDateRecent = subDays(endOfRecentPeriod, 1); // Most recent Sunday
+    const calculatedStartDateRecent = subWeeks(calculatedEndDateRecent, 2); // Two weeks before end date
+    
+    // Define the comparison period as the 52 weeks before the recent period
+    const calculatedEndDateComparison = subDays(calculatedStartDateRecent, 1); // One day before the recent period starts
+    const calculatedStartDateComparison = subDays(calculatedEndDateComparison, 364); // 52 weeks = 364 days
   
-  // Find the most recent Sunday (start of the last complete week)
-  const lastSunday = new Date(today);
-  lastSunday.setDate(today.getDate() - dayOfWeek - 7);
-  lastSunday.setHours(23, 59, 59, 999);
-  
-  // Find the end of the second-to-last week (Saturday)
-  const endOfSecondToLastWeek = new Date(lastSunday);
-  endOfSecondToLastWeek.setDate(lastSunday.getDate() - 1);
-  
-  // Find the start of the second-to-last week (two weeks ago Sunday)
-  const startOfSecondToLastWeek = new Date(endOfSecondToLastWeek);
-  startOfSecondToLastWeek.setDate(endOfSecondToLastWeek.getDate() - 13);
-  
-  // Define the comparison period (52 weeks before the start of the recent period)
-  const calculatedEndDateComparison = new Date(startOfSecondToLastWeek);
-  calculatedEndDateComparison.setDate(calculatedEndDateComparison.getDate() - 1);
-  const calculatedStartDateComparison = new Date(calculatedEndDateComparison);
-  calculatedStartDateComparison.setDate(calculatedEndDateComparison.getDate() - 364); // 52 weeks = 364 days
-  
-  return {
-    calculatedStartDateRecent: startOfSecondToLastWeek,
-    calculatedEndDateRecent: lastSunday,
-    calculatedStartDateComparison,
-    calculatedEndDateComparison,
+    return {
+      calculatedStartDateRecent,
+      calculatedEndDateRecent,
+      calculatedStartDateComparison,
+      calculatedEndDateComparison,
+    };
   };
-};
 
-
-  // If data is not provided, fetch the data using another useEffect
+  // Fetch data if not provided
   useEffect(() => {
     if (!data || Object.keys(data).length === 0) {
       console.log("No data passed in, fetching it");
+      setRowsLoaded(0); // Reset rowsLoaded
+      setLoading(true);
 
-      const { 
-        calculatedStartDateRecent, 
-        calculatedEndDateRecent, 
-        calculatedStartDateComparison, 
-        calculatedEndDateComparison 
+      const {
+        calculatedStartDateRecent,
+        calculatedEndDateRecent,
+        calculatedStartDateComparison,
+        calculatedEndDateComparison,
       } = calculateDates();
 
       // Set the calculated dates in state
@@ -75,27 +68,20 @@ const calculateDates = () => {
       setStartDateComparison(calculatedStartDateComparison);
       setEndDateComparison(calculatedEndDateComparison);
 
+      console.log('Dates:', calculatedStartDateRecent, calculatedEndDateRecent, calculatedStartDateComparison, calculatedEndDateComparison);
+
       // Fetch all data concurrently
-      Promise.all([
-        fetchDataFromAPI(
-          getIncidentQuery(
-            calculatedStartDateRecent,
-            calculatedEndDateRecent,
-            calculatedStartDateComparison,
-            calculatedEndDateComparison,
-            district
-          )
+      fetchDataFromAPI(
+        getAnomalyQuery(
+          calculatedStartDateRecent,
+          calculatedEndDateRecent,
+          calculatedStartDateComparison,
+          calculatedEndDateComparison,
+          district
         ),
-        fetchDataFromAPI(
-          getCategoryComparisonQuery(
-            calculatedStartDateRecent,
-            calculatedEndDateRecent,
-            calculatedStartDateComparison,
-            calculatedEndDateComparison,
-            district
-          )
-        ),
-      ]).then(([incidentData, crimeDashData]) => {
+        null,          // No need for updateLoadingCount in this context
+        setRowsLoaded  // Pass setRowsLoaded as updateProgress
+      ).then((incidentData) => {
         // Process and set incident data
         console.log('Processing incident data');
         const { groupedData, metadata } = processData(
@@ -110,80 +96,91 @@ const calculateDates = () => {
 
         const results = calculateStatisticsAndAnomalies(groupedData);
         const sortedAnomalies = results.anomalies.sort((a, b) => {
-          const deltaA = Math.abs(a.recentAvg - a.longTermAvg);
-          const deltaB = Math.abs(b.recentAvg - b.longTermAvg);
+          const deltaA = Math.abs(a.recentAvg - a.comparisonAvg);
+          const deltaB = Math.abs(b.recentAvg - b.comparisonAvg);
           return deltaB - deltaA;
         });
+
         setAnomalies(sortedAnomalies);
         setStatistics(results.statistics);
+
+        // Separate out-of-bounds anomalies and in-bounds categories using `outOfBounds`
+        const outOfBounds = sortedAnomalies.filter(anomaly => anomaly.outOfBounds);
+        const inBounds = sortedAnomalies.filter(anomaly => !anomaly.outOfBounds);
+
+        setOutOfBoundsAnomalies(outOfBounds);
+        setInBoundsCategories(inBounds);
+
+        setLoading(false); // Data fetching and processing done
       });
     }
   }, [data, district]);
 
-  // Main data processing and setting state
+  // Main data processing
   useEffect(() => {
-    console.log('useEffect called for data processing');
-    console.log('Data:', data);
-    console.log('Metadata:', metadata);
-    
     if (data && Object.keys(data).length > 0) {
+      console.log('useEffect called for data processing');
       const results = calculateStatisticsAndAnomalies(data);
       const sortedAnomalies = results.anomalies.sort((a, b) => {
-        const deltaA = Math.abs(a.recentAvg - a.longTermAvg);
-        const deltaB = Math.abs(b.recentAvg - b.longTermAvg);
+        const deltaA = Math.abs(a.recentAvg - a.comparisonAvg);
+        const deltaB = Math.abs(b.recentAvg - b.comparisonAvg);
         return deltaB - deltaA;
       });
+
       setAnomalies(sortedAnomalies);
       setStatistics(results.statistics);
+
+      // Separate out-of-bounds anomalies and in-bounds categories using `outOfBounds`
+      const outOfBounds = sortedAnomalies.filter(anomaly => anomaly.outOfBounds);
+      const inBounds = sortedAnomalies.filter(anomaly => !anomaly.outOfBounds);
+
+      setOutOfBoundsAnomalies(outOfBounds);
+      setInBoundsCategories(inBounds);
     }
   }, [data]);
 
   const createPlot = (anomaly) => {
+    if (!anomaly.outOfBounds) {
+      return null; // Only plot anomalies marked as out of bounds
+    }
+
     const stat = statistics.find((stat) => stat.category === anomaly.category);
     if (!stat || !stat.entries || stat.entries.length === 0) return null;
-  
-    const { entries } = stat;
-  
+
+    const { entries } = anomaly;
+
+    // Sort entries by date in ascending order
+    entries.sort((a, b) => a.date - b.date);
+
     // Define the date ranges
-    const comparisonStartDate = new Date(metadata.comparisonStart);
-    const comparisonEndDate = new Date(metadata.comparisonEnd || metadata.recentStart);
     const recentStartDate = new Date(metadata.recentStart);
-    const recentEndDate = new Date(metadata.recentEnd);
-  
+
     // Extract xValues and yValues from entries
-    const xValuesAll = entries.map((entry) => entry.date.toISOString().substring(0, 10));
+    const xValuesAll = entries.map((entry) =>
+      entry.date.toISOString().substring(0, 10)
+    );
     const yValuesAll = entries.map((entry) => entry.count);
-  
-    // Split entries into comparison and recent periods
-    const entriesComparison = entries.filter((entry) => {
-      const entryDate = new Date(entry.date);
-      return entryDate >= comparisonStartDate && entryDate < recentStartDate;
-    });
-  
-    const entriesRecent = entries.filter((entry) => {
-      const entryDate = new Date(entry.date);
-      return entryDate >= recentStartDate && entryDate <= recentEndDate;
-    });
-  
-    // Prepare data for comparison period
-    const xValuesComparison = entriesComparison.map((entry) => entry.date.toISOString().substring(0, 10));
-    const yValuesComparison = entriesComparison.map((entry) => entry.count);
-  
-    // Prepare data for recent period
-    const xValuesRecent = entriesRecent.map((entry) => entry.date.toISOString().substring(0, 10));
-    const yValuesRecent = entriesRecent.map((entry) => entry.count);
-  
-    // Create arrays for average lines
-    const comparisonAvgLineX = [xValuesComparison[0], xValuesComparison[xValuesComparison.length - 1]];
-    const comparisonAvgLineY = [anomaly.comparisonAvg, anomaly.comparisonAvg];
-  
-    const recentAvgLineX = [xValuesRecent[0], xValuesRecent[xValuesRecent.length - 1]];
-    const recentAvgLineY = [anomaly.recentAvg, anomaly.recentAvg];
-  
+
+    // Find the index where the recent period starts
+    const splitIndex = entries.findIndex(
+      (entry) => entry.date >= recentStartDate
+    );
+
+    // Ensure the lines connect by including the first point of the recent period in the comparison array
+    const xValuesComparison = xValuesAll.slice(0, splitIndex + 1); // Include the first point of the recent period
+    const yValuesComparison = yValuesAll.slice(0, splitIndex + 1); // Include the first point of the recent period
+
+    const xValuesRecent = xValuesAll.slice(splitIndex); // Start from the split index (original recent period)
+    const yValuesRecent = yValuesAll.slice(splitIndex); // Start from the split index (original recent period)
+
     // Normal range shading over the entire period
-    const plus2SigmaArray = xValuesAll.map(() => anomaly.comparisonAvg + 2 * anomaly.comparisonStdDev);
-    const minus2SigmaArray = xValuesAll.map(() => anomaly.comparisonAvg - 2 * anomaly.comparisonStdDev);
-  
+    const plus2SigmaArray = xValuesAll.map(
+      () => anomaly.comparisonAvg + 2 * anomaly.comparisonStdDev
+    );
+    const minus2SigmaArray = xValuesAll.map(
+      () => anomaly.comparisonAvg - 2 * anomaly.comparisonStdDev
+    );
+
     return (
       <div className={styles.plotContainer}>
         <Plot
@@ -210,7 +207,7 @@ const calculateDates = () => {
               showlegend: false,
               hoverinfo: "skip",
             },
-            // Comparison Period Data
+            // Combined Line for Comparison Period
             {
               type: "scatter",
               mode: "lines+markers",
@@ -221,7 +218,7 @@ const calculateDates = () => {
               name: "Comparison Period",
               showlegend: false,
             },
-            // Recent Period Data
+            // Combined Line for Recent Period
             {
               type: "scatter",
               mode: "lines+markers",
@@ -232,31 +229,11 @@ const calculateDates = () => {
               name: "Recent Period",
               showlegend: false,
             },
-            // Comparison Average Line
-            {
-              type: "scatter",
-              mode: "lines",
-              x: comparisonAvgLineX,
-              y: comparisonAvgLineY,
-              line: { color: "grey", width: 4 },
-              name: "Comparison Average",
-              showlegend: false,
-            },
-            // Recent Average Line
-            {
-              type: "scatter",
-              mode: "lines",
-              x: recentAvgLineX,
-              y: recentAvgLineY,
-              line: { color: "gold", width: 4 },
-              name: "Recent Average",
-              showlegend: false,
-            },
           ]}
           layout={{
             autosize: true,
             margin: { l: 40, r: 20, t: 20, b: 45 },
-            showlegend: false, // Hide the legend
+            showlegend: false,
             xaxis: { title: "Week" },
             yaxis: {
               title: "Police Reports Per Week",
@@ -276,26 +253,60 @@ const calculateDates = () => {
       </div>
     );
   };
-  
-  
-  
-  
+
+  // Calculate totals for in-bounds categories
+  const totalCategories = anomalies.length;
+  const totalInBoundsCategories = inBoundsCategories.length;
+  const percentageInBoundsCategories = ((totalInBoundsCategories / totalCategories) * 100).toFixed(1);
+
+  const totalIncidents = anomalies.reduce((sum, anomaly) => sum + anomaly.recentAvg, 0);
+  const totalInBoundsIncidents = inBoundsCategories.reduce((sum, anomaly) => sum + anomaly.recentAvg, 0);
+  const percentageInBoundsIncidents = ((totalInBoundsIncidents / totalIncidents) * 100).toFixed(1);
+
+  const triangleIcon = isInBoundsExpanded ? '▼' : '▶';
 
   return (
     <div className={styles.anomalyContainer}>
-      {anomalies.length > 0 ? (
-        anomalies.map((anomaly, index) => (
-          <div
-            key={index}
-            className={`${styles.anomalyItem} ${
-              anomaly.recentAvg > anomaly.comparisonAvg ? styles.positive : styles.negative
-            }`}
-          >
-            <div className={styles.title}>{getHeadline(anomaly, district)}</div>
-            {createPlot(anomaly)}
-            <div className={styles.bodyText}>{getText(anomaly, metadata)}</div>
-          </div>
-        ))
+      {loading ? (
+        <p>Processing SFOpenData... {rowsLoaded} police incidents</p>
+      ) : anomalies.length > 0 ? (
+        <>
+          {/* Display list of in-bounds categories */}
+          {inBoundsCategories.length > 0 && (
+            <div className={styles.inBoundsContainer}>
+              <h2 onClick={() => setIsInBoundsExpanded(!isInBoundsExpanded)} className={styles.clickableHeader}>
+                <span className={styles.triangleIcon}>{triangleIcon}</span> Categories within normal range ({totalInBoundsCategories} categories / {percentageInBoundsCategories}%)
+              </h2>
+              {isInBoundsExpanded && (
+                <ul className={styles.inBoundsList}>
+                  {inBoundsCategories.map((anomaly, index) => (
+                    <li key={index}>
+                      <strong>{anomaly.category}</strong>: Recent Avg: {Math.round(anomaly.recentAvg)}, Comparison Avg: {Math.round(anomaly.comparisonAvg)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {/* Display anomalies that are out of bounds */}
+          {outOfBoundsAnomalies.length > 0 ? (
+            outOfBoundsAnomalies.map((anomaly, index) => (
+              <div
+                key={index}
+                className={`${styles.anomalyItem} ${
+                  anomaly.recentAvg > anomaly.comparisonAvg ? styles.positive : styles.negative
+                }`}
+              >
+                <div className={styles.title}>{getHeadline(anomaly, district)}</div>
+                {createPlot(anomaly)}
+                <div className={styles.bodyText}>{getText(anomaly, metadata)}</div>
+              </div>
+            ))
+          ) : (
+            <p>No anomalies found out of bounds.</p>
+          )}
+        </>
       ) : (
         <p>No anomalies found.</p>
       )}
@@ -304,6 +315,7 @@ const calculateDates = () => {
 }
 
 export default AnomalyDisplay;
+
 
 function getHeadline(anomaly, district) {
   const trend = anomaly.recentAvg > anomaly.comparisonAvg ? "Up" : "Down";
@@ -315,7 +327,7 @@ function getText(anomaly, metadata) {
     console.log("Metadata or anomaly is undefined.");
     return <span>Data is loading or incomplete...</span>;
   }
-  console.log(anomaly);
+
   try {
     const recentPeriodEndFormatted = format(new Date(metadata.recentEnd), 'MMM dd');
     const recentPeriodStartFormatted = format(new Date(metadata.recentStart), 'MMM dd');
@@ -336,7 +348,7 @@ function getText(anomaly, metadata) {
       metadata.district ? `SF District ${metadata.district}` : "SF"
     } saw an average of ${Math.round(recentAvg)} police reports of ${anomaly.category} filed per week, which is <span style="color:${diffColor}">${diff}%</span> ${trend} than the comparison average of ${Math.round(
       comparisonAvg
-    )} reports per week. This average falls within the normal range of ${lowerBound} to ${upperBound} reports per week based on the comparison period.`;
+    )} reports per week. This average falls outside the normal range of ${lowerBound} to ${upperBound} reports per week based on the comparison period.`;
 
     return <span dangerouslySetInnerHTML={{ __html: text }} />;
   } catch (error) {

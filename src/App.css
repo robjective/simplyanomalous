@@ -5,9 +5,33 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Remove the default MUI Tabs indicator */
-.MuiTabs-indicator {
-  display: none;
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden; /* Disable horizontal scrolling */
+  font-family: 'Open Sans', sans-serif;
+  color: #999;
+}
+
+/* Full-width header styling */
+.header-full-width {
+  width: 100%;
+  background-color: #FFF; /* Light gray background color */
+  padding: 10px 0; /* Add vertical padding */
+}
+
+
+/* Container within header */
+.header-container {
+  @apply max-w-screen-xl mx-auto flex items-center px-4 py-4; /* Center the content with maximum width */
+  gap: 10px; /* Space between title and badge */
+}
+
+/* Ensure there's only bottom spacing between header and tab navigation */
+.tabs-full-width {
+  width: 100%;
+  margin-top: 0; /* Remove margin-top to prevent spacing between header and tabs */
+  margin-bottom: 20px; /* Maintain spacing below tabs */
 }
 
 /* Optional: Adjust the Tabs container to align pills properly */
@@ -52,13 +76,17 @@ a:active {
 body {
     font-family: 'Open Sans', sans-serif; /* Use Open Sans with fallback to sans-serif */
     color: #999;
+    margin: 0px
     }
 
 /* Styling for h1 to make it smaller */
 header h1 {
   @apply text-lg m-0;
   display: inline; /* Make sure the h1 is inline */
-  font-size:18pt;
+  font-size:16pt;
+  font-weight: bold;
+  color: #999; /* Dark grey color */
+  padding:10px;
 }
 
 /* Basic styling for navigation container */
@@ -81,6 +109,11 @@ nav a:hover {
 /* Styling for active link */
 nav a.active {
   @apply bg-gray-500 text-white;
+}
+
+/*SOMETHING*/ 
+.subhead {
+  padding: 10px;
 }
 
 /* Styling for sub-nav and top-nav buttons and links */
