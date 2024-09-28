@@ -89,18 +89,20 @@ function App() {
     <Router>
       {/* Full-width header */}
       <header className="header-full-width">
-        <div className="header-container">
-          <h1>Transparent San Francisco</h1>
-          <span className="badge">Beta</span>
-          <div className="subhead">
-            Accountability through open data,{" "}
-            <a href="#" onClick={scrollToLearnMore}>
-              learn more.
-            </a>
-          
-          </div>
-        </div>
-      </header>
+  <div className="header-container">
+    <div className="header-title-container">
+      <h1 className="header-title">Transparent SF</h1>
+      <div className="beta-label">BETA</div>
+    </div>
+    <div className="subhead">
+      Accountability through open data,{" "}
+      <a href="#" onClick={scrollToLearnMore}>
+        learn more.
+      </a>
+    </div>
+  </div>
+</header>
+
 
       {/* Full-width Tabs */}
       <div className="tabs-full-width supervisor-tabs overflow-x-auto py-5">
@@ -121,6 +123,7 @@ function App() {
             },
           }}
         >
+          {/* Tabs */}
           <Tab
             key="citywide"
             label={
@@ -268,21 +271,29 @@ function App() {
 
         {/* Learn More Section */}
         <div id="learn-more" className="learn-more-section py-10">
+          {/* Learn More content */}
+        </div>
+      
+      <div id="learn-more" className="learn-more-section py-10">
           <div id="rationale" className="rationale-section py-10">
-            <h2>About Us</h2>
+            <h2>Transparent SF</h2>
             <p>
-              Transparent SF is on a mission is to make public data easy for
-              everyone to understand, so communities can hold public officials
-              accountable and promote better government. We are an open source
-              project built on San Francisco's open data. Join our community
-              and help us build a more transparent San Francisco.
+            Our mission is to make public data clear and easy to understand, empowering communities to hold officials accountable for their results. As an open-source project built on San Francisco's open data, we invite you to join us in building a more transparent city."
             </p>
           </div>
           <div id="rationale" className="rationale-section py-10">
-            <h2>Methodology</h2>
+          <h2>Methodology</h2>
             <p>
-              .
-            </p>
+  The crime dashboard is powered by data from <a href="https://data.sfgov.org/">San Francisco's Open Data Portal</a>, which provides public access to various datasets for transparency. Specifically, we use the <a href="https://data.sfgov.org/Public-Safety/Police-Department-Incident-Reports-2018-to-Present/wg3w-h783">Police Incident Reports dataset</a> that records incidents reported to the police. For more detailed information on this dataset, you can visit the <a href="https://sfdigitalservices.gitbook.io/dataset-explainers/sfpd-incident-report-2018-to-present">Police Incident Data Explainer</a>.
+</p>
+
+<p>
+  This dashboard shows only the initial reports of incidents, excluding any follow-ups or supplemental records, to provide a clearer view of distinct crime events. Data is filtered by date and neighborhood to easily show trends and comparisons.
+</p>
+
+<p>
+  Please note that certain violent crimes, such as rape and homicide, are often kept confidential and excluded from the public dataset for privacy and safety reasons. For more accurate data on these types of crimes, refer to the official <a href="https://www.sanfranciscopolice.org/stay-safe/crime-data/compstat">CompStat Reports</a>.
+</p>
           </div>
           <div id="contact" className="contact-section py-10">
             <h2>Stay Updated</h2>
@@ -304,7 +315,6 @@ function App() {
           </div>
         </div>
       </div>
-
       {/* Footer */}
       <footer>
         <nav>
@@ -320,29 +330,6 @@ function App() {
       )}
     </Router>
   );
-}
-
-// Component to handle location change
-function LocationSync({ setSelectedSupervisor, supervisors }) {
-  const location = useLocation();
-
-  useEffect(() => {
-    const pathParts = location.pathname.split("/");
-    if (pathParts.length > 1) {
-      const supervisorPart = pathParts[1];
-      const selectedSupervisor = supervisors.find(
-        (sup) =>
-          sup.sup_name.replace(/\s+/g, "-").toLowerCase() === supervisorPart
-      );
-      if (selectedSupervisor) {
-        setSelectedSupervisor(selectedSupervisor.sup_dist_num);
-      } else if (location.pathname === "/") {
-        setSelectedSupervisor("citywide");
-      }
-    }
-  }, [location.pathname, supervisors, setSelectedSupervisor]);
-
-  return null;
 }
 
 export default App;

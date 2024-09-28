@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transparent SF Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Inline styles for gradient */
+        .capsule {
+            background: linear-gradient(to bottom, #f87171, #34d399);
+        }
+        .active {
+            background-color: #3b82f6;
+            color: white;
+        }
+    </style>
+</head>
+
+<body class="flex flex-col items-center p-4">
+
+    <!-- Header -->
+    <div class="w-full flex justify-between items-center p-4 border-b-2 border-gray-200">
+        <h1 class="text-xl font-bold">Transparent SF</h1>
+        <span class="text-sm text-red-600 border border-red-600 px-2 py-1 rounded">BETA</span>
+    </div>
+
+    <!-- Date Range Selector -->
+    <div class="w-full flex justify-around items-center mt-4 p-2 border-b-2 border-gray-200">
+        <button onclick="selectDateRange(this)" class="text-sm py-1 px-3 border border-gray-300 rounded-md">Last 2 weeks</button>
+        <button onclick="selectDateRange(this)" class="text-sm py-1 px-3 border border-gray-300 rounded-md">Last month</button>
+        <button onclick="selectDateRange(this)" class="text-sm py-1 px-3 border border-gray-300 rounded-md">Year to date</button>
+        <button onclick="selectDateRange(this)" class="text-sm py-1 px-3 border border-gray-300 rounded-md">Since elected</button>
+    </div>
+
+    <!-- Mayor Info -->
+    <div class="mt-4 flex flex-col items-center text-center">
+        <img src="mayor-photo-url.jpg" alt="Mayor" class="w-24 h-24 rounded-full object-cover">
+        <h2 class="mt-2 text-lg font-bold">Mayor Jane Doe</h2>
+    </div>
+
+    <!-- Capsules -->
+    <div class="mt-4 w-full">
+        <!-- Capsule 1 -->
+        <div class="capsule w-full mb-4 p-4 rounded-xl h-[25vh] cursor-pointer transition-transform"
+            onclick="toggleExpand(this)">
+            <h3 class="text-lg font-semibold">Crime</h3>
+            <p class="mt-2 text-sm">Crime down across the board, homicide at 60 year low</p>
+            <div class="hidden mt-4 flex space-x-2">
+                <img src="chart-thumbnail-1.jpg" alt="Crime Chart 1" class="w-1/2 h-20 object-cover rounded-md">
+                <img src="chart-thumbnail-2.jpg" alt="Crime Chart 2" class="w-1/2 h-20 object-cover rounded-md">
+            </div>
+        </div>
+
+        <!-- Capsule 2 -->
+        <div class="capsule w-full mb-4 p-4 rounded-xl h-[25vh] cursor-pointer transition-transform"
+            onclick="toggleExpand(this)">
+            <h3 class="text-lg font-semibold">Economy</h3>
+            <p class="mt-2 text-sm">Economy grows steadily, unemployment at 3%</p>
+            <div class="hidden mt-4 flex space-x-2">
+                <img src="chart-thumbnail-1.jpg" alt="Economy Chart 1" class="w-1/2 h-20 object-cover rounded-md">
+                <img src="chart-thumbnail-2.jpg" alt="Economy Chart 2" class="w-1/2 h-20 object-cover rounded-md">
+            </div>
+        </div>
+
+        <!-- Capsule 3 -->
+        <div class="capsule w-full mb-4 p-4 rounded-xl h-[25vh] cursor-pointer transition-transform"
+            onclick="toggleExpand(this)">
+            <h3 class="text-lg font-semibold">Housing</h3>
+            <p class="mt-2 text-sm">Housing prices stabilize with new developments</p>
+            <div class="hidden mt-4 flex space-x-2">
+                <img src="chart-thumbnail-1.jpg" alt="Housing Chart 1" class="w-1/2 h-20 object-cover rounded-md">
+                <img src="chart-thumbnail-2.jpg" alt="Housing Chart 2" class="w-1/2 h-20 object-cover rounded-md">
+            </div>
+        </div>
+
+        <!-- Capsule 4 -->
+        <div class="capsule w-full mb-4 p-4 rounded-xl h-[25vh] cursor-pointer transition-transform"
+            onclick="toggleExpand(this)">
+            <h3 class="text-lg font-semibold">Health</h3>
+            <p class="mt-2 text-sm">Public health improves, hospitalizations drop</p>
+            <div class="hidden mt-4 flex space-x-2">
+                <img src="chart-thumbnail-1.jpg" alt="Health Chart 1" class="w-1/2 h-20 object-cover rounded-md">
+                <img src="chart-thumbnail-2.jpg" alt="Health Chart 2" class="w-1/2 h-20 object-cover rounded-md">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleExpand(element) {
+            // Toggle the height of the capsule
+            if (element.classList.contains('h-[25vh]')) {
+                element.classList.remove('h-[25vh]');
+                element.classList.add('h-[50vh]');
+                element.querySelector('div').classList.remove('hidden');
+            } else {
+                element.classList.remove('h-[50vh]');
+                element.classList.add('h-[25vh]');
+                element.querySelector('div').classList.add('hidden');
+            }
+        }
+
+        function selectDateRange(button) {
+            // Remove active class from all buttons
+            const buttons = document.querySelectorAll('button');
+            buttons.forEach(btn => btn.classList.remove('active'));
+
+            // Add active class to the clicked button
+            button.classList.add('active');
+
+            // You can add further logic here to handle date range filtering
+            console.log(`Selected date range: ${button.innerText}`);
+        }
+    </script>
+
+</body>
+
+</html>

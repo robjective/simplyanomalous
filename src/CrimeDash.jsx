@@ -102,11 +102,12 @@ function CrimeDash({ data, metadata, districtData }) {
   
     for (const categoryGroup in incidentCategoryChanges) {
       incidentCategoryChanges[categoryGroup].forEach((category) => {
+        console.log(category);
         category.percentChange = category.comparison !== 0 ? ((category.recent - category.comparison) / category.comparison) * 100 : (category.recent > 0 ? 100 : -100);
       });
       incidentCategoryChanges[categoryGroup].sort((a, b) => a.percentChange - b.percentChange);
     }
-    console.log("metadata", metadata);
+    //console.log("metadata", metadata);
     return { categoryGroupDifferences, incidentCategoryChanges };
   };
 

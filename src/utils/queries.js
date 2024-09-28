@@ -46,7 +46,7 @@ export const getCategoryComparisonQuery = (startDateRecent, endDateRecent, start
           WHEN ${whereClauseRecent} THEN 'Recent Period'
           WHEN ${whereClauseComparison} THEN 'Comparison Period'
         END AS period
-      WHERE (${whereClauseRecent}) OR (${whereClauseComparison})
+      WHERE ((${whereClauseRecent}) OR (${whereClauseComparison})) AND report_type_code = 'II'
       GROUP BY incident_category, supervisor_district, category_group, period
       ORDER BY supervisor_district, category_group, incident_category, period`
   };
@@ -71,7 +71,7 @@ export const getIncidentQuery = (startDateRecent, endDateRecent, startDateCompar
     endpoint: "wg3w-h783.json",
     query: `
       SELECT incident_category, supervisor_district, date_trunc_ymd(report_datetime) AS date, COUNT(*) AS count 
-      WHERE (${whereClauseRecent}) OR (${whereClauseComparison})
+      WHERE ((${whereClauseRecent}) OR (${whereClauseComparison})) AND report_type_code = 'II'
       GROUP BY incident_category, supervisor_district, date 
       ORDER BY date`
   };
@@ -109,7 +109,7 @@ export const getAnomalyQuery = (
           WHEN report_datetime >= '${startDateRecentStr}' AND report_datetime <= '${endDateRecentStr}' THEN 'recent'
           ELSE 'comparison'
         END AS period
-      WHERE (${whereClauseRecent}) OR (${whereClauseComparison}) 
+      WHERE (${whereClauseRecent}) OR (${whereClauseComparison}) and report_type_code = 'II'
       GROUP BY incident_description, date, period
       ORDER BY incident_description, date
     `,

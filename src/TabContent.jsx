@@ -27,7 +27,8 @@ function TabContent({
   const [allData, setAllData] = useState([]);
   const [crimeDashData, setCrimeDashData] = useState([]);
   const [districtData, setDistrictData] = useState(null);
-  const [isLoading, setIsLoading] = useState(false); // Single loading state
+  const [isLoading, setIsLoading] = useState(false);
+  const [rowsLoaded, setRowsLoaded] = useState(0); // New state for tracking rows loaded
   const [metadata, setMetadata] = useState({});
   const [incidentData, setIncidentData] = useState([]);
   const [dateRange, setDateRange] = useState('lastTwoWeeks');
@@ -46,6 +47,7 @@ function TabContent({
     const fetchData = async () => {
       console.log('Starting data fetch, setting isLoading to true');
       setIsLoading(true); // Set loading state to true at the start
+      setRowsLoaded(0);   // Reset rowsLoaded at the start
       try {
         await fetchDistrictData(district);
       } catch (error) {
@@ -163,7 +165,9 @@ function TabContent({
             startDateComparison,
             endDateComparison,
             district
-          )
+          ),
+          null,          // No need for updateLoadingCount in this context
+          setRowsLoaded  // Pass setRowsLoaded as updateProgress
         ),
         fetchDataFromAPI(
           getCategoryComparisonQuery(
@@ -187,9 +191,10 @@ function TabContent({
         endDateComparison
       );
       setAllData(groupedData || []);
-      setMetadata(metadata || {});
+      setMetadata(metadata || []);
       // Set crime dashboard data
       console.log('Setting crime dashboard data');
+      console.log('Crime Dash Data:', crimeDashData);
       setCrimeDashData(crimeDashData || []);
 
       // Create and set district GeoJSON data
@@ -227,7 +232,7 @@ function TabContent({
     <Box>
       <Box>
         <Typography variant="h6" gutterBottom>
-            {district ? `District ${Math.floor(district)}` : 'Citywide'} Crime Dashboard
+          {district ? `District ${Math.floor(district)}` : 'Citywide'} Crime Dashboard
         </Typography>
         
         <Box display="flex" alignItems="center" mb={2}>
@@ -283,7 +288,9 @@ function TabContent({
         {isLoading ? (
           <div>
             <CircularProgress />
-            <Typography variant="body1">Loading...</Typography>
+            <Typography variant="body1">
+              Processing SFOpenData... {rowsLoaded} police incidents
+            </Typography>
           </div>
         ) : (
           <>

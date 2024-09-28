@@ -168,7 +168,7 @@ export const calculateStatisticsAndAnomalies = (groupedData) => {
 
     // Calculate if the category is out of bounds (deviation > 1/2 sigma)
     const outOfBounds = 
-    Math.abs(recentAvg - comparisonAvg) > (comparisonStdDev * 1.5) &&
+    Math.abs(recentAvg - comparisonAvg) > (comparisonStdDev * 2) &&
     recentAvg >= 1 &&
     comparisonAvg >= 1;
 
